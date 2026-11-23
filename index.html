@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>대앰생회의 지각비 플래너 &amp; 정산소</title>
+  <title>앰생전산 지각비 플래너 &amp; 정산소</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.min.js"></script>
@@ -30,7 +30,7 @@
         <i data-lucide="lock" class="w-6 h-6"></i>
       </div>
       <div>
-        <h2 class="text-lg font-bold text-slate-900">대앰생회의 전용 입장</h2>
+        <h2 class="text-lg font-bold text-slate-900">앰생전산 전용 입장</h2>
         <p class="text-xs text-slate-500 mt-1">친구들끼리 정한 입장 비밀번호를 입력하세요.</p>
       </div>
       <div class="space-y-2.5">
@@ -49,14 +49,18 @@
           <i data-lucide="calendar-clock" class="w-5 h-5"></i>
         </div>
         <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900 leading-tight">대앰생회의 지각비 플래너</h1>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900 leading-tight">앰생전산 지각비 플래너</h1>
             <button id="btn-open-sync-modal" type="button" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
               <span id="sync-status-dot" class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
               <span id="sync-status-text">로컬 모드</span>
             </button>
+            <button id="btn-open-profile-modal" type="button" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
+              <i data-lucide="user" class="w-3 h-3"></i>
+              <span id="header-profile-label">아이디 설정</span>
+            </button>
           </div>
-          <p class="text-xs text-slate-500">제 0회 대앰생회의 공식 기준 · 매년 k 초기화</p>
+          <p class="text-xs text-slate-500">제 0회 앰생전산 공식 기준 · 매년 k 초기화</p>
         </div>
       </div>
 
@@ -65,6 +69,11 @@
         <button id="tab-btn-planner" type="button" class="tab-active px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap">
           <i data-lucide="calendar-days" class="w-4 h-4"></i>
           <span>캘린더</span>
+        </button>
+        <button id="tab-btn-chat" type="button" class="text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap">
+          <i data-lucide="message-circle" class="w-4 h-4"></i>
+          <span>채팅</span>
+          <span id="chat-unread-badge" class="hidden ml-0.5 px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-bold">N</span>
         </button>
         <button id="tab-btn-calc" type="button" class="text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap">
           <i data-lucide="calculator" class="w-4 h-4"></i>
@@ -164,9 +173,27 @@
               </button>
             </div>
 
+            <!-- Join Meetup Bar -->
+            <div class="p-3 rounded-xl bg-indigo-50/70 border border-indigo-100 space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-semibold text-indigo-900">참여자 합류 (아이디 기준 식별 · N 자동 반영)</span>
+                <span id="settle-attendee-count-label" class="text-[11px] font-bold text-indigo-600">0명 참여</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button id="btn-join-as-me" type="button" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-xs">
+                  <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+                  <span id="btn-join-as-me-label">내 아이디로 참여하기</span>
+                </button>
+                <div class="flex flex-1 min-w-[160px] gap-1.5">
+                  <input id="join-meetup-name" type="text" placeholder="다른 친구 추가 (예: 민수)" class="flex-1 px-2.5 py-1.5 rounded-lg border border-indigo-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <button id="btn-join-meetup" type="button" class="px-2.5 py-1.5 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition shrink-0">추가</button>
+                </div>
+              </div>
+            </div>
+
             <!-- Attendee Quick Chips -->
             <div id="settle-attendee-chips-wrap" class="hidden space-y-1.5">
-              <div class="text-xs font-semibold text-slate-600">참석자 빠른 선택 (누르면 올해 누적 k 자동 반영)</div>
+              <div class="text-xs font-semibold text-slate-600">참석자 선택 (클릭 시 지각자 입력 · ×로 불참)</div>
               <div id="settle-attendee-chips" class="flex flex-wrap gap-1.5"></div>
             </div>
 
@@ -225,6 +252,37 @@
               <div id="settle-records-list" class="space-y-2"></div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: REALTIME CHAT -->
+    <section id="view-chat" class="hidden max-w-3xl mx-auto">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[70vh] min-h-[460px] max-h-[680px]">
+        <!-- Chat Header -->
+        <div class="px-4 py-3 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="messages-square" class="w-4 h-4 text-indigo-600"></i>
+            <span class="text-sm font-bold text-slate-900">모임 채팅방</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <label for="chat-channel-select" class="text-xs text-slate-500 font-medium">방 선택:</label>
+            <select id="chat-channel-select" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="general">전체 자유 채팅방</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Messages List -->
+        <div id="chat-messages-list" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/40"></div>
+
+        <!-- Chat Input -->
+        <div class="p-3 border-t border-slate-200 bg-white flex items-center gap-2">
+          <input id="chat-input" type="text" placeholder="메시지를 입력하세요..." class="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button id="btn-send-chat" type="button" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 shrink-0">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span>전송</span>
+          </button>
         </div>
       </div>
     </section>
@@ -379,7 +437,7 @@
     <!-- SECTION 2: RULES -->
     <section id="view-rules" class="hidden space-y-4 max-w-3xl mx-auto">
       <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm space-y-2">
-        <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">제 0회 대앰생회의</div>
+        <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">제 0회 앰생전산</div>
         <h2 class="text-lg font-bold text-slate-900">1. 개요 (도입 취지)</h2>
         <p class="text-sm text-slate-600 leading-relaxed">
           모두의 소중한 시간을 보호하고 정시 도착자의 불필요한 대기 시간을 줄이기 위해, 앞으로 매 모임 약속 시간 정각까지 지정된 약속 장소에 도착하지 못할 경우 지각비 공식에 따라 지각비를 걷어 공금으로 활용합니다.
@@ -518,6 +576,19 @@
           </div>
         </div>
 
+        <div>
+          <span class="block text-xs font-semibold text-slate-600 mb-1.5">참여 방식</span>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-mode-open" type="button" class="py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-indigo-600 bg-indigo-50 text-indigo-700">
+              자유 참여형 (약속만 생성)
+            </button>
+            <button id="btn-mode-fixed" type="button" class="py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700">
+              인원 확정형 (미리 지정)
+            </button>
+          </div>
+          <p id="modal-mode-hint" class="text-[11px] text-slate-500 mt-1">약속만 열어두면 친구들이 직접 '참여하기'를 눌러 모임 인원(N)이 채워집니다.</p>
+        </div>
+
         <div class="grid grid-cols-3 gap-3">
           <div class="col-span-2">
             <label for="modal-meetup-place" class="block text-xs font-semibold text-slate-600 mb-1">약속 장소 (선택)</label>
@@ -525,14 +596,14 @@
           </div>
           <div>
             <label for="modal-meetup-n" class="block text-xs font-semibold text-slate-600 mb-1">인원수 (N)</label>
-            <input id="modal-meetup-n" type="number" min="1" max="50" value="4" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input id="modal-meetup-n" type="number" min="0" max="50" value="0" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
 
         <div>
-          <label for="modal-meetup-attendees" class="block text-xs font-semibold text-slate-600 mb-1">참석 친구 이름 (쉼표로 구분, 선택)</label>
-          <input id="modal-meetup-attendees" type="text" placeholder="예: 철수, 영희, 민수, 지수" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <p class="text-[11px] text-slate-400 mt-1">이름을 입력하면 인원수(N)가 자동 반영되고 정산 시 클릭만으로 선택할 수 있어요.</p>
+          <label for="modal-meetup-attendees" class="block text-xs font-semibold text-slate-600 mb-1">초기 참석자 이름 (쉼표로 구분, 선택)</label>
+          <input id="modal-meetup-attendees" type="text" placeholder="비워두면 0명부터 시작 (예: 철수, 영희)" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <p class="text-[11px] text-slate-400 mt-1">나중에 약속 카드에서 누구나 이름을 입력해 참여하거나 나갈 수 있어요.</p>
         </div>
       </div>
 
@@ -592,6 +663,43 @@
     </div>
   </div>
 
+  <!-- Modal: User ID & Profile Onboarding -->
+  <div id="profile-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 w-full max-w-sm p-5 sm:p-6 shadow-xl space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
+            <i data-lucide="badge-check" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">내 아이디 설정</h3>
+            <p class="text-[11px] text-slate-500">동명이인 혼동 방지 &amp; 채팅·지각 횟수 식별용</p>
+          </div>
+        </div>
+        <button id="btn-close-profile-modal" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label for="profile-id-input" class="block text-xs font-semibold text-slate-600 mb-1">고유 아이디 (ID)</label>
+          <input id="profile-id-input" type="text" placeholder="예: chulsoo99 (영문/숫자 추천)" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <p class="text-[11px] text-slate-400 mt-1">같은 아이디를 유지하면 올해 지각 횟수(k)가 정확히 누적됩니다.</p>
+        </div>
+        <div>
+          <label for="profile-name-input" class="block text-xs font-semibold text-slate-600 mb-1">표시 이름 (닉네임)</label>
+          <input id="profile-name-input" type="text" placeholder="예: 철수" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-1">
+        <button id="btn-cancel-profile-modal" type="button" class="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition">나중에</button>
+        <button id="btn-save-profile-modal" type="button" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm">저장하고 시작</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-medium shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50">
     복사되었습니다.
@@ -613,6 +721,8 @@
       const STORAGE_KEY_RECORDS = 'daemsaeng_late_fee_records_v1';
       const STORAGE_KEY_MEETUPS = 'daemsaeng_meetups_v1';
       const STORAGE_KEY_SYNC = 'daemsaeng_sync_config_v1';
+      const STORAGE_KEY_PROFILE = 'daemsaeng_profile_v1';
+      const STORAGE_KEY_CHAT = 'daemsaeng_chat_v1';
       const BASE_X = 200;
 
       const SETUP_SQL = `create table if not exists meetups (
@@ -650,18 +760,40 @@ alter table late_records enable row level security;
 create policy "Allow all for meetups" on meetups for all using (true) with check (true);
 create policy "Allow all for late_records" on late_records for all using (true) with check (true);
 
+alter table late_records add column if not exists member_id text default '';
+
+create table if not exists chat_messages (
+  id text primary key,
+  room_id text not null,
+  channel_id text not null default 'general',
+  sender_id text not null,
+  sender_name text not null,
+  message text not null,
+  created_at timestamptz default now()
+);
+
+alter table chat_messages enable row level security;
+create policy "Allow all for chat_messages" on chat_messages for all using (true) with check (true);
+
+grant all on table public.meetups to anon, authenticated;
+grant all on table public.late_records to anon, authenticated;
+grant all on table public.chat_messages to anon, authenticated;
+
 alter publication supabase_realtime add table meetups;
-alter publication supabase_realtime add table late_records;`;
+alter publication supabase_realtime add table late_records;
+alter publication supabase_realtime add table chat_messages;`;
 
       // Navigation elements
       const tabBtns = {
         planner: document.getElementById('tab-btn-planner'),
+        chat: document.getElementById('tab-btn-chat'),
         calc: document.getElementById('tab-btn-calc'),
         history: document.getElementById('tab-btn-history'),
         rules: document.getElementById('tab-btn-rules'),
       };
       const views = {
         planner: document.getElementById('view-planner'),
+        chat: document.getElementById('view-chat'),
         calc: document.getElementById('view-calc'),
         history: document.getElementById('view-history'),
         rules: document.getElementById('view-rules'),
@@ -706,8 +838,31 @@ alter publication supabase_realtime add table late_records;`;
       const settleMeetupTitle = document.getElementById('settle-meetup-title');
       const settleMeetupMeta = document.getElementById('settle-meetup-meta');
       const btnCopyMeetupSummary = document.getElementById('btn-copy-meetup-summary');
+      const settleAttendeeCountLabel = document.getElementById('settle-attendee-count-label');
+      const btnOpenProfileModal = document.getElementById('btn-open-profile-modal');
+      const headerProfileLabel = document.getElementById('header-profile-label');
+      const profileModal = document.getElementById('profile-modal');
+      const btnCloseProfileModal = document.getElementById('btn-close-profile-modal');
+      const btnCancelProfileModal = document.getElementById('btn-cancel-profile-modal');
+      const btnSaveProfileModal = document.getElementById('btn-save-profile-modal');
+      const profileIdInput = document.getElementById('profile-id-input');
+      const profileNameInput = document.getElementById('profile-name-input');
+
+      const chatUnreadBadge = document.getElementById('chat-unread-badge');
+      const chatChannelSelect = document.getElementById('chat-channel-select');
+      const chatMessagesList = document.getElementById('chat-messages-list');
+      const chatInput = document.getElementById('chat-input');
+      const btnSendChat = document.getElementById('btn-send-chat');
+
+      const btnJoinAsMe = document.getElementById('btn-join-as-me');
+      const btnJoinAsMeLabel = document.getElementById('btn-join-as-me-label');
+      const joinMeetupName = document.getElementById('join-meetup-name');
+      const btnJoinMeetup = document.getElementById('btn-join-meetup');
       const settleAttendeeChipsWrap = document.getElementById('settle-attendee-chips-wrap');
       const settleAttendeeChips = document.getElementById('settle-attendee-chips');
+      const btnModeOpen = document.getElementById('btn-mode-open');
+      const btnModeFixed = document.getElementById('btn-mode-fixed');
+      const modalModeHint = document.getElementById('modal-mode-hint');
       const settleName = document.getElementById('settle-name');
       const settleK = document.getElementById('settle-k');
       const settleMultBadge = document.getElementById('settle-mult-badge');
@@ -774,9 +929,14 @@ alter publication supabase_realtime add table late_records;`;
 
       let records = loadJson(STORAGE_KEY_RECORDS, []);
       let meetups = loadJson(STORAGE_KEY_MEETUPS, []);
+      let chatMessages = loadJson(STORAGE_KEY_CHAT, []);
+      let userProfile = loadJson(STORAGE_KEY_PROFILE, null);
       let syncConfig = loadSyncConfig();
       let sbClient = null;
       let sbChannel = null;
+      let currentTab = 'planner';
+      let activeChatChannel = 'general';
+      let selectedSettleMemberId = '';
 
       inputDate.value = todayStr;
 
@@ -787,6 +947,7 @@ alter publication supabase_realtime add table late_records;`;
           if (pinInput.value === DEFAULT_CONFIG.accessPin) {
             pinGate.classList.add('hidden');
             pinError.classList.add('hidden');
+            if (!userProfile || !userProfile.id) openProfileModal();
           } else {
             pinError.classList.remove('hidden');
           }
@@ -909,6 +1070,14 @@ alter publication supabase_realtime add table late_records;`;
               { event: '*', schema: 'public', table: 'late_records', filter: `room_id=eq.${syncConfig.roomId}` },
               () => { fetchRemoteData(); }
             )
+            .on(
+              'postgres_changes',
+              { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `room_id=eq.${syncConfig.roomId}` },
+              () => {
+                if (currentTab !== 'chat') chatUnreadBadge.classList.remove('hidden');
+                fetchRemoteData();
+              }
+            )
             .subscribe();
 
           setSyncBadge(true);
@@ -954,6 +1123,7 @@ alter publication supabase_realtime add table late_records;`;
             id: r.id,
             meetupId: r.meetup_id || null,
             meetupTitle: r.meetup_title || '',
+            memberId: r.member_id || '',
             name: r.name,
             date: r.date,
             n: r.n,
@@ -964,6 +1134,25 @@ alter publication supabase_realtime add table late_records;`;
             total: r.total,
             exempt: !!r.exempt,
           }));
+
+          try {
+            const cRes = await sbClient
+              .from('chat_messages')
+              .select('*')
+              .eq('room_id', syncConfig.roomId)
+              .order('created_at', { ascending: true })
+              .limit(200);
+            if (!cRes.error && Array.isArray(cRes.data)) {
+              chatMessages = cRes.data.map((c) => ({
+                id: c.id,
+                channelId: c.channel_id || 'general',
+                senderId: c.sender_id,
+                senderName: c.sender_name,
+                message: c.message,
+                createdAt: c.created_at,
+              }));
+            }
+          } catch (e) {}
 
           renderAll();
         } catch (e) {
@@ -1011,6 +1200,27 @@ alter publication supabase_realtime add table late_records;`;
         }
       }
 
+      async function persistUpdateMeetup(id, patch) {
+        meetups = meetups.map((m) => (m.id === id ? { ...m, ...patch } : m));
+        try {
+          localStorage.setItem(STORAGE_KEY_MEETUPS, JSON.stringify(meetups));
+        } catch (e) {}
+        renderAll();
+
+        if (sbClient) {
+          try {
+            const { error } = await sbClient
+              .from('meetups')
+              .update(patch)
+              .eq('id', id)
+              .eq('room_id', syncConfig.roomId);
+            if (error) throw error;
+          } catch (e) {
+            showToast('참여자 업데이트 동기화에 실패했습니다.');
+          }
+        }
+      }
+
       async function persistAddRecord(item) {
         records = [item, ...records];
         try {
@@ -1020,11 +1230,12 @@ alter publication supabase_realtime add table late_records;`;
 
         if (sbClient) {
           try {
-            const { error } = await sbClient.from('late_records').insert({
+            const payload = {
               id: item.id,
               room_id: syncConfig.roomId,
               meetup_id: item.meetupId || null,
               meetup_title: item.meetupTitle || '',
+              member_id: item.memberId || '',
               name: item.name,
               date: item.date,
               n: item.n,
@@ -1034,7 +1245,13 @@ alter publication supabase_realtime add table late_records;`;
               mult: item.mult,
               total: item.total,
               exempt: !!item.exempt,
-            });
+            };
+            let { error } = await sbClient.from('late_records').insert(payload);
+            if (error) {
+              delete payload.member_id;
+              const retry = await sbClient.from('late_records').insert(payload);
+              error = retry.error;
+            }
             if (error) throw error;
           } catch (e) {
             showToast('원격 DB 기록 저장에 실패했습니다.');
@@ -1070,11 +1287,44 @@ alter publication supabase_realtime add table late_records;`;
         }
       }
 
+      function normAttendee(a) {
+        if (typeof a === 'string') return { id: '', name: a };
+        if (a && typeof a === 'object') return { id: a.id || '', name: a.name || a.id || '익명' };
+        return { id: '', name: '익명' };
+      }
+
+      async function persistAddChatMessage(msgObj) {
+        chatMessages = [...chatMessages, msgObj];
+        try {
+          localStorage.setItem(STORAGE_KEY_CHAT, JSON.stringify(chatMessages.slice(-200)));
+        } catch (e) {}
+        renderChat();
+
+        if (sbClient) {
+          try {
+            const { error } = await sbClient.from('chat_messages').insert({
+              id: msgObj.id,
+              room_id: syncConfig.roomId,
+              channel_id: msgObj.channelId,
+              sender_id: msgObj.senderId,
+              sender_name: msgObj.senderName,
+              message: msgObj.message,
+              created_at: msgObj.createdAt,
+            });
+            if (error) throw error;
+          } catch (e) {
+            showToast('채팅 전송에 실패했습니다. Supabase SQL을 확인하세요.');
+          }
+        }
+      }
+
       function renderAll() {
+        renderProfileUI();
         renderCalendar();
         renderSelectedDay();
         renderSettlePanel();
         renderHistory();
+        renderChat();
       }
 
       function formatWon(num) {
@@ -1089,16 +1339,21 @@ alter publication supabase_realtime add table late_records;`;
           .replace(/"/g, '&quot;');
       }
 
-      function getAnnualLateCount(name, yearStr) {
-        if (!name || !name.trim()) return 0;
-        const target = name.trim();
-        return records.filter(
-          (r) =>
-            !r.exempt &&
-            r.name &&
-            r.name.trim() === target &&
-            (r.date || '').startsWith(yearStr)
-        ).length;
+      function getAnnualLateCount(name, yearStr, memberId) {
+        const cleanId = (memberId || '').trim();
+        const cleanName = (name || '').trim();
+        if (!cleanId && !cleanName) return 0;
+        return records.filter((r) => {
+          if (r.exempt) return false;
+          if (!(r.date || '').startsWith(yearStr)) return false;
+          if (cleanId && r.memberId) {
+            return r.memberId.trim() === cleanId;
+          }
+          if (cleanId && !r.memberId) {
+            return cleanName ? (r.name || '').trim() === cleanName : false;
+          }
+          return cleanName ? (r.name || '').trim() === cleanName : false;
+        }).length;
       }
 
       // Sync Modal Events
@@ -1146,8 +1401,54 @@ alter publication supabase_realtime add table late_records;`;
         showToast('로컬 모드로 전환했습니다.');
       });
 
+      // Profile UI & Modal
+      function renderProfileUI() {
+        if (userProfile && userProfile.id) {
+          headerProfileLabel.textContent = `${userProfile.name} (@${userProfile.id})`;
+          btnJoinAsMeLabel.textContent = `${userProfile.name} (@${userProfile.id})로 참여`;
+        } else {
+          headerProfileLabel.textContent = '아이디 설정';
+          btnJoinAsMeLabel.textContent = '내 아이디로 참여하기';
+        }
+      }
+
+      function openProfileModal() {
+        profileIdInput.value = userProfile ? userProfile.id : '';
+        profileNameInput.value = userProfile ? userProfile.name : '';
+        profileModal.classList.remove('hidden');
+        profileIdInput.focus();
+      }
+
+      function closeProfileModal() {
+        profileModal.classList.add('hidden');
+      }
+
+      btnOpenProfileModal.addEventListener('click', openProfileModal);
+      btnCloseProfileModal.addEventListener('click', closeProfileModal);
+      btnCancelProfileModal.addEventListener('click', closeProfileModal);
+
+      btnSaveProfileModal.addEventListener('click', () => {
+        const id = profileIdInput.value.trim().replace(/\s+/g, '');
+        const name = profileNameInput.value.trim() || id;
+        if (!id) {
+          showToast('고유 아이디를 입력해 주세요.');
+          return;
+        }
+        userProfile = { id, name };
+        try {
+          localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(userProfile));
+        } catch (e) {}
+        renderAll();
+        closeProfileModal();
+        showToast(`${name} (@${id})님으로 설정되었습니다!`);
+      });
+
       // Tab Switching
       function switchTab(name) {
+        currentTab = name;
+        if (name === 'chat') {
+          chatUnreadBadge.classList.add('hidden');
+        }
         Object.keys(views).forEach((key) => {
           if (key === name) {
             views[key].classList.remove('hidden');
@@ -1159,9 +1460,13 @@ alter publication supabase_realtime add table late_records;`;
             tabBtns[key].classList.add('text-slate-600', 'hover:text-slate-900');
           }
         });
+        if (name === 'chat') {
+          renderChat();
+        }
       }
 
       tabBtns.planner.addEventListener('click', () => switchTab('planner'));
+      tabBtns.chat.addEventListener('click', () => switchTab('chat'));
       tabBtns.calc.addEventListener('click', () => switchTab('calc'));
       tabBtns.history.addEventListener('click', () => switchTab('history'));
       tabBtns.rules.addEventListener('click', () => switchTab('rules'));
@@ -1373,13 +1678,34 @@ alter publication supabase_realtime add table late_records;`;
         }
       });
 
+      let meetupCreateMode = 'open';
+
+      function setMeetupCreateMode(mode) {
+        meetupCreateMode = mode;
+        if (mode === 'open') {
+          btnModeOpen.className = 'py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-indigo-600 bg-indigo-50 text-indigo-700';
+          btnModeFixed.className = 'py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700';
+          modalModeHint.textContent = '약속만 열어두면 친구들이 직접 \'참여하기\'를 눌러 모임 인원(N)이 채워집니다.';
+          const cnt = modalMeetupAttendees.value.split(',').map((v) => v.trim()).filter(Boolean).length;
+          modalMeetupN.value = String(cnt);
+        } else {
+          btnModeFixed.className = 'py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-indigo-600 bg-indigo-50 text-indigo-700';
+          btnModeOpen.className = 'py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700';
+          modalModeHint.textContent = '인원수(N)와 참석자를 처음부터 확정해서 만듭니다.';
+          if ((parseInt(modalMeetupN.value, 10) || 0) === 0) modalMeetupN.value = '4';
+        }
+      }
+
+      btnModeOpen.addEventListener('click', () => setMeetupCreateMode('open'));
+      btnModeFixed.addEventListener('click', () => setMeetupCreateMode('fixed'));
+
       function openMeetupModal(defaultDate) {
         modalMeetupTitle.value = '';
         modalMeetupDate.value = defaultDate || selectedDate;
         modalMeetupTime.value = '18:00';
         modalMeetupPlace.value = '';
-        modalMeetupN.value = '4';
         modalMeetupAttendees.value = '';
+        setMeetupCreateMode('open');
         meetupModal.classList.remove('hidden');
         modalMeetupTitle.focus();
       }
@@ -1412,7 +1738,10 @@ alter publication supabase_realtime add table late_records;`;
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean);
-        const n = Math.max(1, parseInt(modalMeetupN.value, 10) || attendees.length || 4);
+        const rawN = parseInt(modalMeetupN.value, 10);
+        const n = meetupCreateMode === 'open'
+          ? (Number.isNaN(rawN) ? attendees.length : Math.max(0, rawN))
+          : Math.max(1, rawN || attendees.length || 4);
 
         const newMeetup = {
           id: 'm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
@@ -1438,7 +1767,7 @@ alter publication supabase_realtime add table late_records;`;
       function getSettlePreviewValues() {
         const m = meetups.find((x) => x.id === activeMeetupId);
         if (!m) return { n: 1, k: 1, t: 0, mult: 1, total: 0, exempt: false };
-        const n = m.n || 1;
+        const n = Math.max(1, m.n || (m.attendees ? m.attendees.length : 0) || 1);
         const k = Math.max(1, parseInt(settleK.value, 10) || 1);
         const t = Math.max(0, parseInt(settleT.value, 10) || 0);
         const exempt = settleExempt.checked;
@@ -1453,11 +1782,11 @@ alter publication supabase_realtime add table late_records;`;
         settlePreviewAmount.textContent = exempt ? '0원 (면제)' : formatWon(total);
       }
 
-      function syncSettleKForName(nameStr) {
+      function syncSettleKForName(nameStr, memberIdStr) {
         const m = meetups.find((x) => x.id === activeMeetupId);
         if (!m) return;
         const yearStr = (m.date || todayStr).slice(0, 4);
-        const pastCount = getAnnualLateCount(nameStr, yearStr);
+        const pastCount = getAnnualLateCount(nameStr, yearStr, memberIdStr);
         settleK.value = String(pastCount + 1);
         updateSettlePreview();
       }
@@ -1480,13 +1809,19 @@ alter publication supabase_realtime add table late_records;`;
         settleT.value = '5';
         settleExempt.checked = false;
 
-        if (m.attendees && m.attendees.length > 0) {
+        const curAttendees = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
+        settleAttendeeCountLabel.textContent = `${m.n}명 참여`;
+        if (curAttendees.length > 0) {
           settleAttendeeChipsWrap.classList.remove('hidden');
           const yearStr = m.date.slice(0, 4);
-          settleAttendeeChips.innerHTML = m.attendees
-            .map((name) => {
-              const cnt = getAnnualLateCount(name, yearStr);
-              return `<button type="button" data-chip-name="${escapeHtml(name)}" class="attendee-chip-btn px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-xs font-semibold text-slate-700 transition">${escapeHtml(name)} <span class="text-[10px] text-slate-400">(${cnt}회)</span></button>`;
+          settleAttendeeChips.innerHTML = curAttendees
+            .map((att) => {
+              const cnt = getAnnualLateCount(att.name, yearStr, att.id);
+              const idTag = att.id ? ` <span class="text-[10px] font-mono text-slate-400">@${escapeHtml(att.id)}</span>` : '';
+              return `<span class="inline-flex items-center rounded-lg bg-slate-100 overflow-hidden border border-slate-200/70">
+                <button type="button" data-chip-name="${escapeHtml(att.name)}" data-chip-id="${escapeHtml(att.id)}" class="attendee-chip-btn px-2.5 py-1 hover:bg-indigo-100 hover:text-indigo-700 text-xs font-semibold text-slate-700 transition">${escapeHtml(att.name)}${idTag} <span class="text-[10px] text-indigo-500">(${cnt}회)</span></button>
+                <button type="button" data-leave-name="${escapeHtml(att.name)}" data-leave-id="${escapeHtml(att.id)}" class="leave-chip-btn px-1.5 py-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="참여 취소">×</button>
+              </span>`;
             })
             .join('');
         } else {
@@ -1527,16 +1862,75 @@ alter publication supabase_realtime add table late_records;`;
         if (window.lucide) window.lucide.createIcons();
       }
 
+      function addParticipantToActiveMeetup(id, name) {
+        const m = meetups.find((x) => x.id === activeMeetupId);
+        if (!m) return;
+        const cur = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
+        const dup = id
+          ? cur.some((a) => a.id === id)
+          : cur.some((a) => !a.id && a.name === name);
+        if (dup) {
+          showToast(`${name}님은 이미 참여 중입니다.`);
+          return;
+        }
+        const nextAttendees = [...cur, { id: id || '', name }];
+        const nextN = (m.n === cur.length || m.n < nextAttendees.length) ? nextAttendees.length : m.n;
+        persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
+        showToast(`${name}${id ? ' (@' + id + ')' : ''}님이 약속에 참여했습니다! (${nextN}명)`);
+      }
+
+      btnJoinAsMe.addEventListener('click', () => {
+        if (!userProfile || !userProfile.id) {
+          openProfileModal();
+          showToast('먼저 내 아이디를 설정해 주세요.');
+          return;
+        }
+        addParticipantToActiveMeetup(userProfile.id, userProfile.name);
+      });
+
+      function handleJoinMeetup() {
+        const name = joinMeetupName.value.trim();
+        if (!name) {
+          showToast('추가할 친구 이름을 입력해 주세요.');
+          return;
+        }
+        joinMeetupName.value = '';
+        addParticipantToActiveMeetup('', name);
+      }
+
+      btnJoinMeetup.addEventListener('click', handleJoinMeetup);
+      joinMeetupName.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleJoinMeetup();
+      });
+
       settleAttendeeChips.addEventListener('click', (e) => {
+        const leaveBtn = e.target.closest('.leave-chip-btn');
+        if (leaveBtn) {
+          const m = meetups.find((x) => x.id === activeMeetupId);
+          if (!m) return;
+          const targetName = leaveBtn.getAttribute('data-leave-name');
+          const targetId = leaveBtn.getAttribute('data-leave-id');
+          const cur = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
+          const nextAttendees = cur.filter((a) =>
+            targetId ? a.id !== targetId : !(a.id === '' && a.name === targetName)
+          );
+          const nextN = m.n === cur.length ? nextAttendees.length : m.n;
+          persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
+          showToast(`${targetName}님이 참여를 취소했습니다.`);
+          return;
+        }
         const chip = e.target.closest('.attendee-chip-btn');
         if (!chip) return;
         const name = chip.getAttribute('data-chip-name');
+        const id = chip.getAttribute('data-chip-id') || '';
+        selectedSettleMemberId = id;
         settleName.value = name;
-        syncSettleKForName(name);
+        syncSettleKForName(name, id);
       });
 
       settleName.addEventListener('input', () => {
-        syncSettleKForName(settleName.value);
+        selectedSettleMemberId = '';
+        syncSettleKForName(settleName.value, '');
       });
 
       settleArrivedTime.addEventListener('input', () => {
@@ -1564,6 +1958,7 @@ alter publication supabase_realtime add table late_records;`;
           id: 'r_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
           meetupId: m.id,
           meetupTitle: m.title,
+          memberId: selectedSettleMemberId,
           name,
           date: m.date,
           n,
@@ -1575,6 +1970,7 @@ alter publication supabase_realtime add table late_records;`;
           exempt,
         };
         settleName.value = '';
+        selectedSettleMemberId = '';
         persistAddRecord(item);
         showToast(`${name}님 지각비 ${formatWon(total)} 저장 완료!`);
       });
@@ -1593,7 +1989,7 @@ alter publication supabase_realtime add table late_records;`;
         const mRecords = records.filter((r) => r.meetupId === m.id);
         const mSum = mRecords.reduce((acc, r) => acc + (r.total || 0), 0);
         const lines = [
-          `[대앰생회의 약속 정산] ${m.title}`,
+          `[앰생전산 약속 정산] ${m.title}`,
           `• 일시: ${m.date} ${m.time}${m.place ? ' / ' + m.place : ''} (${m.n}명)`,
         ];
         if (mRecords.length === 0) {
@@ -1715,7 +2111,7 @@ alter publication supabase_realtime add table late_records;`;
         const name = (inputName.value || '').trim() || '지각자';
         const date = inputDate.value || todayStr;
         const { n, k, t, x, mult, total } = getValues();
-        const msg = `[대앰생회의 지각비 정산]\n• 대상: ${name} (${date})\n• 조건: ${n}명 / 올해 ${k}회차(${mult}배) / ${t}분 지각 / 기본 ${x}원\n• 금액: ${formatWon(total)}\n• 기한: 지각 확정 후 7일 내 공금관리계좌 입금`;
+        const msg = `[앰생전산 지각비 정산]\n• 대상: ${name} (${date})\n• 조건: ${n}명 / 올해 ${k}회차(${mult}배) / ${t}분 지각 / 기본 ${x}원\n• 금액: ${formatWon(total)}\n• 기한: 지각 확정 후 7일 내 공금관리계좌 입금`;
         copyText(msg, '단톡방 공유 문구를 복사했습니다.');
       });
 
@@ -1748,19 +2144,22 @@ alter publication supabase_realtime add table late_records;`;
         const yearPrefix = String(now.getFullYear());
         const counts = {};
         records.forEach((r) => {
-          if (!r.exempt && (r.date || '').startsWith(yearPrefix) && r.name) {
-            const key = r.name.trim();
-            counts[key] = (counts[key] || 0) + 1;
+          if (!r.exempt && (r.date || '').startsWith(yearPrefix) && (r.memberId || r.name)) {
+            const key = r.memberId ? `id:${r.memberId}` : `name:${r.name.trim()}`;
+            if (!counts[key]) {
+              counts[key] = { label: r.memberId ? `${r.name} (@${r.memberId})` : r.name.trim(), count: 0 };
+            }
+            counts[key].count += 1;
           }
         });
-        const names = Object.keys(counts);
-        if (names.length > 0) {
+        const keys = Object.keys(counts);
+        if (keys.length > 0) {
           historyKSummaryCard.classList.remove('hidden');
-          historyKSummary.innerHTML = names
-            .sort((a, b) => counts[b] - counts[a])
+          historyKSummary.innerHTML = keys
+            .sort((a, b) => counts[b].count - counts[a].count)
             .map(
-              (nm) =>
-                `<span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold">${escapeHtml(nm)}: ${counts[nm]}회 (다음 ${Math.pow(2, counts[nm])}배)</span>`
+              (k) =>
+                `<span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold">${escapeHtml(counts[k].label)}: ${counts[k].count}회 (다음 ${Math.pow(2, counts[k].count)}배)</span>`
             )
             .join('');
         } else {
@@ -1836,10 +2235,102 @@ alter publication supabase_realtime add table late_records;`;
         showToast('모든 기록을 삭제했습니다.');
       });
 
+      // ================== REALTIME CHAT ==================
+      function renderChat() {
+        // Sync channel dropdown options with meetups
+        const prevVal = activeChatChannel;
+        const opts = ['<option value="general">전체 자유 채팅방</option>'];
+        const sortedMeetups = [...meetups].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+        sortedMeetups.forEach((m) => {
+          opts.push(`<option value="${escapeHtml(m.id)}">[${m.date.slice(5)}] ${escapeHtml(m.title)}</option>`);
+        });
+        chatChannelSelect.innerHTML = opts.join('');
+        if (prevVal === 'general' || meetups.some((m) => m.id === prevVal)) {
+          chatChannelSelect.value = prevVal;
+        } else {
+          activeChatChannel = 'general';
+          chatChannelSelect.value = 'general';
+        }
+
+        const list = chatMessages.filter((c) => (c.channelId || 'general') === activeChatChannel);
+        if (list.length === 0) {
+          chatMessagesList.innerHTML = `
+            <div class="h-full flex items-center justify-center text-center text-xs sm:text-sm text-slate-400">
+              아직 대화가 없습니다. 첫 메시지를 남겨보세요!
+            </div>
+          `;
+          return;
+        }
+
+        const myId = userProfile && userProfile.id ? userProfile.id : '';
+        chatMessagesList.innerHTML = list
+          .map((c) => {
+            const isMine = myId && c.senderId === myId;
+            const timeLabel = c.createdAt
+              ? new Date(c.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+              : '';
+            if (isMine) {
+              return `
+                <div class="flex flex-col items-end">
+                  <div class="max-w-[80%] rounded-2xl rounded-tr-xs bg-indigo-600 text-white px-3.5 py-2 text-sm shadow-xs break-words">
+                    ${escapeHtml(c.message)}
+                  </div>
+                  <span class="text-[10px] text-slate-400 mt-1">${escapeHtml(timeLabel)}</span>
+                </div>
+              `;
+            }
+            return `
+              <div class="flex flex-col items-start">
+                <span class="text-[11px] font-semibold text-slate-600 mb-1">${escapeHtml(c.senderName)} <span class="font-mono text-slate-400">@${escapeHtml(c.senderId)}</span></span>
+                <div class="max-w-[80%] rounded-2xl rounded-tl-xs bg-white border border-slate-200 text-slate-800 px-3.5 py-2 text-sm shadow-xs break-words">
+                  ${escapeHtml(c.message)}
+                </div>
+                <span class="text-[10px] text-slate-400 mt-1">${escapeHtml(timeLabel)}</span>
+              </div>
+            `;
+          })
+          .join('');
+
+        chatMessagesList.scrollTop = chatMessagesList.scrollHeight;
+      }
+
+      chatChannelSelect.addEventListener('change', () => {
+        activeChatChannel = chatChannelSelect.value;
+        renderChat();
+      });
+
+      function sendChatMessage() {
+        if (!userProfile || !userProfile.id) {
+          openProfileModal();
+          showToast('채팅을 보내려면 먼저 내 아이디를 설정해 주세요.');
+          return;
+        }
+        const text = chatInput.value.trim();
+        if (!text) return;
+        chatInput.value = '';
+        const msgObj = {
+          id: 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          channelId: activeChatChannel,
+          senderId: userProfile.id,
+          senderName: userProfile.name,
+          message: text,
+          createdAt: new Date().toISOString(),
+        };
+        persistAddChatMessage(msgObj);
+      }
+
+      btnSendChat.addEventListener('click', sendChatMessage);
+      chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) sendChatMessage();
+      });
+
       // Init all views & try Supabase connection if configured
       renderAll();
       updateCalculator();
       initSupabase();
+      if (!DEFAULT_CONFIG.accessPin && (!userProfile || !userProfile.id)) {
+        openProfileModal();
+      }
       if (window.lucide) {
         window.lucide.createIcons();
       }

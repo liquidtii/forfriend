@@ -1113,6 +1113,8 @@ alter publication supabase_realtime add table activity_logs;`;
       let qrRefreshInterval = null;
       let qrCountdown = 30;
       let pendingQrCheckin = parseQrCheckinParams();
+      let remoteDataLoaded = false;
+      let isCheckingIn = false;
 
       function parseQrCheckinParams() {
         try {
@@ -1371,6 +1373,7 @@ alter publication supabase_realtime add table activity_logs;`;
             }
           } catch (e) {}
 
+          remoteDataLoaded = true;
           renderAll();
           tryProcessPendingQrCheckin();
         } catch (e) {
@@ -1416,6 +1419,33 @@ alter publication supabase_realtime add table activity_logs;`;
             await sbClient.from('meetups').delete().eq('id', id).eq('room_id', syncConfig.roomId);
           } catch (e) {}
         }
+      }
+
+      async function getFreshMeetup(id) {
+        if (sbClient) {
+          try {
+            const { data, error } = await sbClient
+              .from('meetups')
+              .select('*')
+              .eq('id', id)
+              .eq('room_id', syncConfig.roomId)
+              .single();
+            if (!error && data) {
+              const fresh = {
+                id: data.id,
+                title: data.title,
+                date: data.date,
+                time: data.time,
+                place: data.place || '',
+                n: data.n,
+                attendees: Array.isArray(data.attendees) ? data.attendees : [],
+              };
+              meetups = meetups.map((m) => (m.id === id ? fresh : m));
+              return fresh;
+            }
+          } catch (e) {}
+        }
+        return meetups.find((x) => x.id === id) || null;
       }
 
       async function persistUpdateMeetup(id, patch) {
@@ -2305,22 +2335,27 @@ alter publication supabase_realtime add table activity_logs;`;
 
         // Update my check-in button & QR button state:
         if (myAtt && myAtt.status === 'ontime') {
+          btnCheckinMe.disabled = true;
           btnCheckinMeLabel.textContent = `정시 출석 완료 (${myAtt.checkInTime})`;
           btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-default';
           btnShowQr.classList.remove('hidden');
         } else if (myAtt && myAtt.status === 'late') {
+          btnCheckinMe.disabled = true;
           btnCheckinMeLabel.textContent = `지각 체크됨 (${myAtt.lateMinutes}분)`;
           btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-rose-100 text-rose-800 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-default';
           btnShowQr.classList.add('hidden');
         } else if (isTooEarlyForCheckin) {
+          btnCheckinMe.disabled = true;
           btnCheckinMeLabel.textContent = '출석 오픈 전 (약속 1시간 전부터)';
           btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-slate-200 text-slate-500 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed';
           btnShowQr.classList.add('hidden');
         } else if (ontimeCount === 0) {
+          btnCheckinMe.disabled = false;
           btnCheckinMeLabel.textContent = checkedCount === 0 ? '1등 출석 체크 (선발대)' : '출석 체크 (도착 확인)';
           btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-xs';
           btnShowQr.classList.add('hidden');
         } else {
+          btnCheckinMe.disabled = true;
           btnCheckinMeLabel.textContent = '정시 도착자 있음 · QR 찍어 출석하세요';
           btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-slate-200 text-slate-600 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed';
           btnShowQr.classList.add('hidden');
@@ -2343,7 +2378,8 @@ alter publication supabase_realtime add table activity_logs;`;
                 chipBg = 'bg-rose-50 border-rose-200';
               }
               const isMe = myId && att.id === myId;
-              const leaveBtnHtml = isMe
+              const canLeave = isMe && att.status === 'pending';
+              const leaveBtnHtml = canLeave
                 ? `<button type="button" data-leave-name="${escapeHtml(att.name)}" data-leave-id="${escapeHtml(att.id)}" class="leave-chip-btn px-1.5 py-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="내 참여 취소">×</button>`
                 : '';
               return `<span class="inline-flex items-center rounded-lg ${chipBg} overflow-hidden border">
@@ -2404,8 +2440,8 @@ alter publication supabase_realtime add table activity_logs;`;
         if (window.lucide) window.lucide.createIcons();
       }
 
-      function addParticipantToActiveMeetup(id, name) {
-        const m = meetups.find((x) => x.id === activeMeetupId);
+      async function addParticipantToActiveMeetup(id, name) {
+        const m = await getFreshMeetup(activeMeetupId);
         if (!m) return;
         const [yy, mm, dd] = (m.date || todayStr).split('-').map(Number);
         const [hh, mi] = (m.time || '18:00').split(':').map(Number);
@@ -2425,7 +2461,7 @@ alter publication supabase_realtime add table activity_logs;`;
         }
         const nextAttendees = [...cur, { id, name, status: 'pending', checkInTime: '', lateMinutes: 0 }];
         const nextN = nextAttendees.length;
-        persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
+        await persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
         logActivity('약속 참여', `'${m.title}' 약속에 참여 (${nextN}명)`);
         showToast(`${name} (@${id})님이 약속에 참여했습니다! (${nextN}명)`);
       }
@@ -2444,7 +2480,10 @@ alter publication supabase_realtime add table activity_logs;`;
       });
 
       async function performCheckinForMeetup(meetupId, viaQr) {
-        const m = meetups.find((x) => x.id === meetupId);
+        if (isCheckingIn) return;
+        isCheckingIn = true;
+        try {
+        const m = await getFreshMeetup(meetupId);
         if (!m) {
           if (viaQr) showToast('해당 약속을 찾을 수 없습니다.');
           return;
@@ -2549,6 +2588,9 @@ alter publication supabase_realtime add table activity_logs;`;
           logActivity('지각 출석', `'${m.title}' ${viaQr ? 'QR ' : ''}${t}분 지각 (${formatWon(total)})`);
           showToast(`${viaQr ? 'QR ' : ''}${t}분 지각 자동 정산: ${formatWon(total)} (${k}회차 · ${mult}배)`);
         }
+        } finally {
+          isCheckingIn = false;
+        }
       }
 
       btnCheckinMe.addEventListener('click', () => {
@@ -2617,6 +2659,7 @@ alter publication supabase_realtime add table activity_logs;`;
 
       async function tryProcessPendingQrCheckin() {
         if (!pendingQrCheckin) return;
+        if (syncConfig.url && syncConfig.key && !remoteDataLoaded) return;
         if (!DEFAULT_CONFIG.accessPin || pinGate.classList.contains('hidden')) {
           if (!userProfile || !userProfile.id) {
             openProfileModal();
@@ -2650,21 +2693,28 @@ alter publication supabase_realtime add table activity_logs;`;
       settleAttendeeChips.addEventListener('click', (e) => {
         const leaveBtn = e.target.closest('.leave-chip-btn');
         if (leaveBtn) {
-          const m = meetups.find((x) => x.id === activeMeetupId);
-          if (!m) return;
-          const myId = userProfile && userProfile.id ? userProfile.id : '';
-          const targetName = leaveBtn.getAttribute('data-leave-name');
-          const targetId = leaveBtn.getAttribute('data-leave-id');
-          if (!myId || !targetId || targetId !== myId) {
-            showToast('본인의 참여만 취소할 수 있습니다.');
-            return;
-          }
-          const cur = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
-          const nextAttendees = cur.filter((a) => a.id !== targetId);
-          const nextN = m.n === cur.length ? nextAttendees.length : m.n;
-          persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
-          logActivity('참여 취소', `'${m.title}' 약속 참여 취소`);
-          showToast(`${targetName}님이 참여를 취소했습니다.`);
+          (async () => {
+            const m = await getFreshMeetup(activeMeetupId);
+            if (!m) return;
+            const myId = userProfile && userProfile.id ? userProfile.id : '';
+            const targetName = leaveBtn.getAttribute('data-leave-name');
+            const targetId = leaveBtn.getAttribute('data-leave-id');
+            if (!myId || !targetId || targetId !== myId) {
+              showToast('본인의 참여만 취소할 수 있습니다.');
+              return;
+            }
+            const cur = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
+            const targetAtt = cur.find((a) => a.id === targetId);
+            if (targetAtt && (targetAtt.status === 'ontime' || targetAtt.status === 'late')) {
+              showToast('출석이 완료된 후에는 참여를 취소할 수 없습니다.');
+              return;
+            }
+            const nextAttendees = cur.filter((a) => a.id !== targetId);
+            const nextN = nextAttendees.length;
+            await persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
+            logActivity('참여 취소', `'${m.title}' 약속 참여 취소`);
+            showToast(`${targetName}님이 참여를 취소했습니다.`);
+          })();
           return;
         }
         const chip = e.target.closest('.attendee-chip-btn');
@@ -2899,7 +2949,17 @@ alter publication supabase_realtime add table activity_logs;`;
 
       // ================== HISTORY ==================
       function renderHistory() {
-        historyCountBadge.textContent = String(records.length);
+        const unresolvedCount = records.filter((r) => {
+          const st = getVoteContext(r).status;
+          return st === 'none' || st === 'open';
+        }).length;
+        if (unresolvedCount > 0) {
+          historyCountBadge.textContent = String(unresolvedCount);
+          historyCountBadge.classList.remove('hidden');
+        } else {
+          historyCountBadge.textContent = '0';
+          historyCountBadge.classList.add('hidden');
+        }
         const sum = records.reduce((acc, r) => acc + (r.total || 0), 0);
         historyTotalAmount.textContent = formatWon(sum);
 

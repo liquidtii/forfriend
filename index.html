@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     body {
@@ -173,32 +174,48 @@
               </button>
             </div>
 
-            <!-- Join Meetup Bar -->
-            <div class="p-3 rounded-xl bg-indigo-50/70 border border-indigo-100 space-y-2">
+            <!-- Join & Auto Check-in Bar -->
+            <div class="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-100 space-y-2.5">
               <div class="flex items-center justify-between gap-2">
-                <span class="text-xs font-semibold text-indigo-900">참여자 합류 (아이디 기준 식별 · N 자동 반영)</span>
+                <span class="text-xs font-semibold text-indigo-900">참여 및 자동 출석체크</span>
                 <span id="settle-attendee-count-label" class="text-[11px] font-bold text-indigo-600">0명 참여</span>
               </div>
               <div class="flex flex-wrap gap-2">
-                <button id="btn-join-as-me" type="button" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-xs">
-                  <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
-                  <span id="btn-join-as-me-label">내 아이디로 참여하기</span>
+                <button id="btn-join-as-me" type="button" class="px-3 py-1.5 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition flex items-center gap-1.5">
+                  <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+                  <span id="btn-join-as-me-label">내 아이디로 참여</span>
                 </button>
-                <div class="flex flex-1 min-w-[160px] gap-1.5">
-                  <input id="join-meetup-name" type="text" placeholder="다른 친구 추가 (예: 민수)" class="flex-1 px-2.5 py-1.5 rounded-lg border border-indigo-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  <button id="btn-join-meetup" type="button" class="px-2.5 py-1.5 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition shrink-0">추가</button>
-                </div>
+                <button id="btn-checkin-me" type="button" class="flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-xs">
+                  <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                  <span id="btn-checkin-me-label">1등 출석 체크 (선발대)</span>
+                </button>
+                <button id="btn-show-qr" type="button" class="hidden flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-xs">
+                  <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                  <span>출석 QR 띄우기</span>
+                </button>
+              </div>
+              <div class="flex gap-1.5 pt-1">
+                <input id="join-meetup-name" type="text" placeholder="다른 친구 이름 직접 추가 (선택)" class="flex-1 px-2.5 py-1 rounded-lg border border-indigo-200/80 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <button id="btn-join-meetup" type="button" class="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition shrink-0">추가</button>
               </div>
             </div>
 
-            <!-- Attendee Quick Chips -->
+            <!-- Attendee Quick Chips & Attendance Status -->
             <div id="settle-attendee-chips-wrap" class="hidden space-y-1.5">
-              <div class="text-xs font-semibold text-slate-600">참석자 선택 (클릭 시 지각자 입력 · ×로 불참)</div>
+              <div class="text-xs font-semibold text-slate-600">참석 예정자 &amp; 출석 현황 (클릭 시 수동 정산 입력 · ×로 불참)</div>
               <div id="settle-attendee-chips" class="flex flex-wrap gap-1.5"></div>
             </div>
 
-            <!-- Latecomer Form -->
-            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <!-- Manual / Fallback Latecomer Form Toggle -->
+            <div class="flex items-center justify-between pt-1">
+              <button id="btn-toggle-manual-settle" type="button" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center gap-1 transition">
+                <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+                <span>수동 정산 / 면제 처리 열기</span>
+              </button>
+            </div>
+
+            <!-- Latecomer Form (Collapsible fallback) -->
+            <div id="manual-settle-box" class="hidden p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label for="settle-name" class="block text-[11px] font-semibold text-slate-600 mb-1">지각자 이름</label>
@@ -577,34 +594,15 @@
         </div>
 
         <div>
-          <span class="block text-xs font-semibold text-slate-600 mb-1.5">참여 방식</span>
-          <div class="grid grid-cols-2 gap-2">
-            <button id="btn-mode-open" type="button" class="py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-indigo-600 bg-indigo-50 text-indigo-700">
-              자유 참여형 (약속만 생성)
-            </button>
-            <button id="btn-mode-fixed" type="button" class="py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700">
-              인원 확정형 (미리 지정)
-            </button>
-          </div>
-          <p id="modal-mode-hint" class="text-[11px] text-slate-500 mt-1">약속만 열어두면 친구들이 직접 '참여하기'를 눌러 모임 인원(N)이 채워집니다.</p>
+          <label for="modal-meetup-place" class="block text-xs font-semibold text-slate-600 mb-1">약속 장소 (선택)</label>
+          <input id="modal-meetup-place" type="text" placeholder="예: 강남역 11번 출구" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
 
-        <div class="grid grid-cols-3 gap-3">
-          <div class="col-span-2">
-            <label for="modal-meetup-place" class="block text-xs font-semibold text-slate-600 mb-1">약속 장소 (선택)</label>
-            <input id="modal-meetup-place" type="text" placeholder="예: 강남역 11번 출구" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <div>
-            <label for="modal-meetup-n" class="block text-xs font-semibold text-slate-600 mb-1">인원수 (N)</label>
-            <input id="modal-meetup-n" type="number" min="0" max="50" value="0" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-        </div>
-
-        <div>
-          <label for="modal-meetup-attendees" class="block text-xs font-semibold text-slate-600 mb-1">초기 참석자 이름 (쉼표로 구분, 선택)</label>
-          <input id="modal-meetup-attendees" type="text" placeholder="비워두면 0명부터 시작 (예: 철수, 영희)" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <p class="text-[11px] text-slate-400 mt-1">나중에 약속 카드에서 누구나 이름을 입력해 참여하거나 나갈 수 있어요.</p>
-        </div>
+        <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer pt-1">
+          <input id="modal-meetup-autojoin" type="checkbox" checked class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+          <span>약속을 만들면서 내 아이디로 바로 참여하기</span>
+        </label>
+        <p class="text-[11px] text-slate-400">생성 후 각자 '참여하기'와 '출석 체크'를 누르면 인원수(N)와 지각비가 자동으로 계산됩니다.</p>
       </div>
 
       <div class="flex items-center justify-end gap-2 pt-2">
@@ -700,6 +698,37 @@
     </div>
   </div>
 
+  <!-- Modal: Attendance QR Code -->
+  <div id="qr-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 w-full max-w-sm p-5 sm:p-6 shadow-xl space-y-4 text-center">
+      <div class="flex items-center justify-between">
+        <div class="text-left">
+          <h3 class="text-base font-bold text-slate-900">현장 출석체크 QR</h3>
+          <p id="qr-modal-subtitle" class="text-xs text-slate-500">뒤에 온 친구가 카메라로 스캔하면 자동 출석됩니다.</p>
+        </div>
+        <button id="btn-close-qr-modal" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center gap-3">
+        <div id="qr-code-box" class="bg-white p-3 rounded-xl shadow-xs border border-slate-100"></div>
+        <div class="text-xs font-semibold text-indigo-600 flex items-center gap-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span id="qr-timer-label">30초마다 보안 코드 자동 갱신 (30초)</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-copy-qr-link" type="button" class="flex-1 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition flex items-center justify-center gap-1.5">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span>출석 링크 복사</span>
+        </button>
+        <button id="btn-done-qr-modal" type="button" class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-medium shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50">
     복사되었습니다.
@@ -761,6 +790,8 @@ create policy "Allow all for meetups" on meetups for all using (true) with check
 create policy "Allow all for late_records" on late_records for all using (true) with check (true);
 
 alter table late_records add column if not exists member_id text default '';
+alter table late_records add column if not exists vote_status text not null default 'none';
+alter table late_records add column if not exists votes jsonb not null default '[]'::jsonb;
 
 create table if not exists chat_messages (
   id text primary key,
@@ -860,9 +891,18 @@ alter publication supabase_realtime add table chat_messages;`;
       const btnJoinMeetup = document.getElementById('btn-join-meetup');
       const settleAttendeeChipsWrap = document.getElementById('settle-attendee-chips-wrap');
       const settleAttendeeChips = document.getElementById('settle-attendee-chips');
-      const btnModeOpen = document.getElementById('btn-mode-open');
-      const btnModeFixed = document.getElementById('btn-mode-fixed');
-      const modalModeHint = document.getElementById('modal-mode-hint');
+      const btnCheckinMe = document.getElementById('btn-checkin-me');
+      const btnCheckinMeLabel = document.getElementById('btn-checkin-me-label');
+      const btnShowQr = document.getElementById('btn-show-qr');
+      const qrModal = document.getElementById('qr-modal');
+      const qrModalSubtitle = document.getElementById('qr-modal-subtitle');
+      const qrCodeBox = document.getElementById('qr-code-box');
+      const qrTimerLabel = document.getElementById('qr-timer-label');
+      const btnCloseQrModal = document.getElementById('btn-close-qr-modal');
+      const btnDoneQrModal = document.getElementById('btn-done-qr-modal');
+      const btnCopyQrLink = document.getElementById('btn-copy-qr-link');
+      const btnToggleManualSettle = document.getElementById('btn-toggle-manual-settle');
+      const manualSettleBox = document.getElementById('manual-settle-box');
       const settleName = document.getElementById('settle-name');
       const settleK = document.getElementById('settle-k');
       const settleMultBadge = document.getElementById('settle-mult-badge');
@@ -883,8 +923,7 @@ alter publication supabase_realtime add table chat_messages;`;
       const modalMeetupDate = document.getElementById('modal-meetup-date');
       const modalMeetupTime = document.getElementById('modal-meetup-time');
       const modalMeetupPlace = document.getElementById('modal-meetup-place');
-      const modalMeetupN = document.getElementById('modal-meetup-n');
-      const modalMeetupAttendees = document.getElementById('modal-meetup-attendees');
+      const modalMeetupAutojoin = document.getElementById('modal-meetup-autojoin');
 
       // Standalone Calculator elements
       const inputName = document.getElementById('input-name');
@@ -937,6 +976,23 @@ alter publication supabase_realtime add table chat_messages;`;
       let currentTab = 'planner';
       let activeChatChannel = 'general';
       let selectedSettleMemberId = '';
+      let qrRefreshInterval = null;
+      let qrCountdown = 30;
+      let pendingQrCheckin = parseQrCheckinParams();
+
+      function parseQrCheckinParams() {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const meetupId = params.get('checkin');
+          const ts = parseInt(params.get('ts') || '0', 10);
+          if (meetupId) {
+            const cleanUrl = window.location.pathname + window.location.hash;
+            window.history.replaceState({}, '', cleanUrl);
+            return { meetupId, ts };
+          }
+        } catch (e) {}
+        return null;
+      }
 
       inputDate.value = todayStr;
 
@@ -948,6 +1004,7 @@ alter publication supabase_realtime add table chat_messages;`;
             pinGate.classList.add('hidden');
             pinError.classList.add('hidden');
             if (!userProfile || !userProfile.id) openProfileModal();
+            else tryProcessPendingQrCheckin();
           } else {
             pinError.classList.remove('hidden');
           }
@@ -1133,6 +1190,8 @@ alter publication supabase_realtime add table chat_messages;`;
             mult: r.mult,
             total: r.total,
             exempt: !!r.exempt,
+            voteStatus: r.vote_status || 'none',
+            votes: Array.isArray(r.votes) ? r.votes : [],
           }));
 
           try {
@@ -1155,6 +1214,7 @@ alter publication supabase_realtime add table chat_messages;`;
           } catch (e) {}
 
           renderAll();
+          tryProcessPendingQrCheckin();
         } catch (e) {
           showToast('DB 데이터를 불러오지 못했습니다. SQL 테이블 설정을 확인하세요.');
         }
@@ -1245,16 +1305,44 @@ alter publication supabase_realtime add table chat_messages;`;
               mult: item.mult,
               total: item.total,
               exempt: !!item.exempt,
+              vote_status: item.voteStatus || 'none',
+              votes: item.votes || [],
             };
             let { error } = await sbClient.from('late_records').insert(payload);
             if (error) {
               delete payload.member_id;
+              delete payload.vote_status;
+              delete payload.votes;
               const retry = await sbClient.from('late_records').insert(payload);
               error = retry.error;
             }
             if (error) throw error;
           } catch (e) {
             showToast('원격 DB 기록 저장에 실패했습니다.');
+          }
+        }
+      }
+
+      async function persistUpdateRecord(id, patch) {
+        records = records.map((r) => (r.id === id ? { ...r, ...patch } : r));
+        try {
+          localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(records));
+        } catch (e) {}
+        renderAll();
+
+        if (sbClient) {
+          try {
+            const dbPatch = {};
+            if (patch.voteStatus !== undefined) dbPatch.vote_status = patch.voteStatus;
+            if (patch.votes !== undefined) dbPatch.votes = patch.votes;
+            const { error } = await sbClient
+              .from('late_records')
+              .update(dbPatch)
+              .eq('id', id)
+              .eq('room_id', syncConfig.roomId);
+            if (error) throw error;
+          } catch (e) {
+            showToast('투표 상태 동기화에 실패했습니다. SQL 컬럼 추가를 확인하세요.');
           }
         }
       }
@@ -1288,9 +1376,183 @@ alter publication supabase_realtime add table chat_messages;`;
       }
 
       function normAttendee(a) {
-        if (typeof a === 'string') return { id: '', name: a };
-        if (a && typeof a === 'object') return { id: a.id || '', name: a.name || a.id || '익명' };
-        return { id: '', name: '익명' };
+        if (typeof a === 'string') return { id: '', name: a, status: 'pending', checkInTime: '', lateMinutes: 0 };
+        if (a && typeof a === 'object') {
+          return {
+            id: a.id || '',
+            name: a.name || a.id || '익명',
+            status: a.status || 'pending',
+            checkInTime: a.checkInTime || '',
+            lateMinutes: a.lateMinutes || 0,
+          };
+        }
+        return { id: '', name: '익명', status: 'pending', checkInTime: '', lateMinutes: 0 };
+      }
+
+      function getVoterKey(att) {
+        return att.id ? `id:${att.id}` : `name:${att.name}`;
+      }
+
+      function getVoteContext(r) {
+        const m = r.meetupId ? meetups.find((x) => x.id === r.meetupId) : null;
+        const attendees = m && Array.isArray(m.attendees) ? m.attendees.map(normAttendee) : [];
+        const isPayer = (att) => {
+          if (r.memberId && att.id) return att.id === r.memberId;
+          return att.name === r.name;
+        };
+        const eligibleVoters = attendees.filter((att) => !isPayer(att));
+        const votes = Array.isArray(r.votes) ? r.votes : [];
+        const eligibleKeys = new Set(eligibleVoters.map(getVoterKey));
+        const validVotes = votes.filter((v) => eligibleKeys.has(v.key));
+        const totalEligible = eligibleVoters.length;
+        const approvedCount = validVotes.length;
+        const rawStatus = r.voteStatus || 'none';
+        const isPassed = totalEligible > 0 && approvedCount >= totalEligible;
+        const status = r.exempt ? 'exempt' : isPassed ? 'passed' : rawStatus;
+
+        const myId = userProfile && userProfile.id ? userProfile.id : '';
+        const myName = userProfile && userProfile.name ? userProfile.name : '';
+        const myAttendee = attendees.find((att) =>
+          myId && att.id ? att.id === myId : myName && att.name === myName
+        );
+        const canStart = !!myAttendee; // 만난 인원들 중 누구나 투표 시작 가능
+        const isMyPayer = myAttendee ? isPayer(myAttendee) : false;
+        const canVote = !!myAttendee && !isMyPayer; // 정산자 제외
+        const myVoterKey = myAttendee ? getVoterKey(myAttendee) : '';
+        const hasMyVote = canVote && validVotes.some((v) => v.key === myVoterKey);
+
+        return {
+          meetup: m,
+          attendees,
+          eligibleVoters,
+          totalEligible,
+          approvedCount,
+          validVotes,
+          status,
+          canStart,
+          canVote,
+          isMyPayer,
+          myAttendee,
+          myVoterKey,
+          hasMyVote,
+        };
+      }
+
+      function renderVoteBlockHtml(r) {
+        if (r.exempt) {
+          return `<div class="mt-2 text-[11px] font-semibold text-emerald-700">면제/감면 (투표 불필요)</div>`;
+        }
+        const ctx = getVoteContext(r);
+        if (!ctx.meetup) {
+          return `<div class="mt-2 text-[11px] text-slate-400">단독 계산기 기록 (참여 약속 없음)</div>`;
+        }
+        if (ctx.totalEligible === 0) {
+          return `<div class="mt-2 text-[11px] text-rose-600 font-medium">투표 가능 인원이 없습니다 (약속 참여자를 추가해 주세요)</div>`;
+        }
+
+        if (ctx.status === 'none') {
+          return `
+            <div class="mt-2.5 pt-2 border-t border-rose-200/80 flex flex-wrap items-center justify-between gap-2">
+              <span class="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700">
+                <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+                <span>납부 확인 투표 미시작 (만장일치 필요 · ${ctx.totalEligible}명)</span>
+              </span>
+              <button type="button" data-vote-start="${r.id}" class="vote-start-btn px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-semibold transition shadow-xs">
+                투표 시작하기
+              </button>
+            </div>
+          `;
+        }
+
+        const voterBadges = ctx.eligibleVoters
+          .map((att) => {
+            const key = getVoterKey(att);
+            const ok = ctx.validVotes.some((v) => v.key === key);
+            return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+              ok ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/80 text-slate-500'
+            }">${ok ? '✓ ' : ''}${escapeHtml(att.name)}</span>`;
+          })
+          .join('');
+
+        if (ctx.status === 'passed') {
+          return `
+            <div class="mt-2.5 pt-2 border-t border-emerald-200 space-y-1.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700">
+                  <i data-lucide="badge-check" class="w-3.5 h-3.5"></i>
+                  <span>납부 완료 (전원 동의 ${ctx.approvedCount}/${ctx.totalEligible}명)</span>
+                </span>
+              </div>
+              <div class="flex flex-wrap gap-1">${voterBadges}</div>
+            </div>
+          `;
+        }
+
+        // status === 'open'
+        let actionBtn = '';
+        if (ctx.canVote) {
+          actionBtn = ctx.hasMyVote
+            ? `<button type="button" data-vote-toggle="${r.id}" class="vote-toggle-btn px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-semibold transition">동의 취소</button>`
+            : `<button type="button" data-vote-toggle="${r.id}" class="vote-toggle-btn px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold transition shadow-xs">납부 확인 (동의)</button>`;
+        } else if (ctx.isMyPayer) {
+          actionBtn = `<span class="text-[11px] font-medium text-amber-700">정산 당사자 제외</span>`;
+        } else {
+          actionBtn = `<span class="text-[11px] text-slate-400">약속 참여자만 투표</span>`;
+        }
+
+        return `
+          <div class="mt-2.5 pt-2 border-t border-amber-200/80 space-y-1.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-[11px] font-bold text-amber-800">납부 확인 투표 중 (${ctx.approvedCount}/${ctx.totalEligible}명 동의)</span>
+              ${actionBtn}
+            </div>
+            <div class="flex flex-wrap gap-1">${voterBadges}</div>
+          </div>
+        `;
+      }
+
+      function handleVoteStart(recordId) {
+        const r = records.find((x) => x.id === recordId);
+        if (!r) return;
+        const ctx = getVoteContext(r);
+        if (!userProfile || !userProfile.id) {
+          openProfileModal();
+          showToast('투표를 시작하려면 먼저 내 아이디를 설정해 주세요.');
+          return;
+        }
+        if (!ctx.canStart) {
+          showToast('이 약속에 참여한 인원만 투표를 시작할 수 있습니다.');
+          return;
+        }
+        persistUpdateRecord(r.id, { voteStatus: 'open', votes: r.votes || [] });
+        showToast('납부 확인 투표를 시작했습니다!');
+      }
+
+      function handleVoteToggle(recordId) {
+        const r = records.find((x) => x.id === recordId);
+        if (!r) return;
+        if (!userProfile || !userProfile.id) {
+          openProfileModal();
+          showToast('투표하려면 먼저 내 아이디를 설정해 주세요.');
+          return;
+        }
+        const ctx = getVoteContext(r);
+        if (!ctx.canVote || !ctx.myAttendee) {
+          showToast(ctx.isMyPayer ? '돈을 내야 하는 정산 당사자는 투표할 수 없습니다.' : '이 약속에 참여한 인원만 투표할 수 있습니다.');
+          return;
+        }
+        const curVotes = Array.isArray(r.votes) ? r.votes : [];
+        let nextVotes;
+        if (ctx.hasMyVote) {
+          nextVotes = curVotes.filter((v) => v.key !== ctx.myVoterKey);
+        } else {
+          nextVotes = [...curVotes, { key: ctx.myVoterKey, name: ctx.myAttendee.name }];
+        }
+        const eligibleKeys = new Set(ctx.eligibleVoters.map(getVoterKey));
+        const validCount = nextVotes.filter((v) => eligibleKeys.has(v.key)).length;
+        const nextStatus = validCount >= ctx.totalEligible && ctx.totalEligible > 0 ? 'passed' : 'open';
+        persistUpdateRecord(r.id, { voteStatus: nextStatus, votes: nextVotes });
+        showToast(nextStatus === 'passed' ? '전원 동의로 납부가 확정되었습니다!' : ctx.hasMyVote ? '동의를 취소했습니다.' : '납부 확인에 동의했습니다.');
       }
 
       async function persistAddChatMessage(msgObj) {
@@ -1441,6 +1703,7 @@ alter publication supabase_realtime add table chat_messages;`;
         renderAll();
         closeProfileModal();
         showToast(`${name} (@${id})님으로 설정되었습니다!`);
+        tryProcessPendingQrCheckin();
       });
 
       // Tab Switching
@@ -1678,34 +1941,12 @@ alter publication supabase_realtime add table chat_messages;`;
         }
       });
 
-      let meetupCreateMode = 'open';
-
-      function setMeetupCreateMode(mode) {
-        meetupCreateMode = mode;
-        if (mode === 'open') {
-          btnModeOpen.className = 'py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-indigo-600 bg-indigo-50 text-indigo-700';
-          btnModeFixed.className = 'py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700';
-          modalModeHint.textContent = '약속만 열어두면 친구들이 직접 \'참여하기\'를 눌러 모임 인원(N)이 채워집니다.';
-          const cnt = modalMeetupAttendees.value.split(',').map((v) => v.trim()).filter(Boolean).length;
-          modalMeetupN.value = String(cnt);
-        } else {
-          btnModeFixed.className = 'py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-indigo-600 bg-indigo-50 text-indigo-700';
-          btnModeOpen.className = 'py-2 px-2.5 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700';
-          modalModeHint.textContent = '인원수(N)와 참석자를 처음부터 확정해서 만듭니다.';
-          if ((parseInt(modalMeetupN.value, 10) || 0) === 0) modalMeetupN.value = '4';
-        }
-      }
-
-      btnModeOpen.addEventListener('click', () => setMeetupCreateMode('open'));
-      btnModeFixed.addEventListener('click', () => setMeetupCreateMode('fixed'));
-
       function openMeetupModal(defaultDate) {
         modalMeetupTitle.value = '';
         modalMeetupDate.value = defaultDate || selectedDate;
         modalMeetupTime.value = '18:00';
         modalMeetupPlace.value = '';
-        modalMeetupAttendees.value = '';
-        setMeetupCreateMode('open');
+        modalMeetupAutojoin.checked = !!(userProfile && userProfile.id);
         meetupModal.classList.remove('hidden');
         modalMeetupTitle.focus();
       }
@@ -1719,29 +1960,16 @@ alter publication supabase_realtime add table chat_messages;`;
       btnCloseMeetupModal.addEventListener('click', closeMeetupModal);
       btnCancelMeetupModal.addEventListener('click', closeMeetupModal);
 
-      modalMeetupAttendees.addEventListener('input', () => {
-        const list = modalMeetupAttendees.value
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        if (list.length > 0) {
-          modalMeetupN.value = String(list.length);
-        }
-      });
-
       btnSaveMeetupModal.addEventListener('click', () => {
         const title = modalMeetupTitle.value.trim() || '모임 약속';
         const date = modalMeetupDate.value || selectedDate;
         const time = modalMeetupTime.value || '18:00';
         const place = modalMeetupPlace.value.trim();
-        const attendees = modalMeetupAttendees.value
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const rawN = parseInt(modalMeetupN.value, 10);
-        const n = meetupCreateMode === 'open'
-          ? (Number.isNaN(rawN) ? attendees.length : Math.max(0, rawN))
-          : Math.max(1, rawN || attendees.length || 4);
+        const autoJoin = modalMeetupAutojoin.checked && userProfile && userProfile.id;
+        const attendees = autoJoin
+          ? [{ id: userProfile.id, name: userProfile.name, status: 'pending', checkInTime: '', lateMinutes: 0 }]
+          : [];
+        const n = attendees.length;
 
         const newMeetup = {
           id: 'm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
@@ -1810,7 +2038,30 @@ alter publication supabase_realtime add table chat_messages;`;
         settleExempt.checked = false;
 
         const curAttendees = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
-        settleAttendeeCountLabel.textContent = `${m.n}명 참여`;
+        const checkedCount = curAttendees.filter((a) => a.status === 'ontime' || a.status === 'late').length;
+        settleAttendeeCountLabel.textContent = `${m.n}명 참여 · ${checkedCount}명 출석`;
+
+        // Update my check-in button & QR button state (1st person uses button, others scan QR)
+        const myId = userProfile && userProfile.id ? userProfile.id : '';
+        const myAtt = myId ? curAttendees.find((a) => a.id === myId) : null;
+        if (myAtt && myAtt.status === 'ontime') {
+          btnCheckinMeLabel.textContent = `정시 출석 완료 (${myAtt.checkInTime})`;
+          btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-default';
+          btnShowQr.classList.remove('hidden');
+        } else if (myAtt && myAtt.status === 'late') {
+          btnCheckinMeLabel.textContent = `지각 체크됨 (${myAtt.lateMinutes}분)`;
+          btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-rose-100 text-rose-800 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-default';
+          btnShowQr.classList.remove('hidden');
+        } else if (checkedCount === 0) {
+          btnCheckinMeLabel.textContent = '1등 출석 체크 (선발대)';
+          btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-xs';
+          btnShowQr.classList.add('hidden');
+        } else {
+          btnCheckinMeLabel.textContent = '1등 출석 완료 · QR 찍어 출석하세요';
+          btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-slate-200 text-slate-600 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed';
+          btnShowQr.classList.add('hidden');
+        }
+
         if (curAttendees.length > 0) {
           settleAttendeeChipsWrap.classList.remove('hidden');
           const yearStr = m.date.slice(0, 4);
@@ -1818,8 +2069,17 @@ alter publication supabase_realtime add table chat_messages;`;
             .map((att) => {
               const cnt = getAnnualLateCount(att.name, yearStr, att.id);
               const idTag = att.id ? ` <span class="text-[10px] font-mono text-slate-400">@${escapeHtml(att.id)}</span>` : '';
-              return `<span class="inline-flex items-center rounded-lg bg-slate-100 overflow-hidden border border-slate-200/70">
-                <button type="button" data-chip-name="${escapeHtml(att.name)}" data-chip-id="${escapeHtml(att.id)}" class="attendee-chip-btn px-2.5 py-1 hover:bg-indigo-100 hover:text-indigo-700 text-xs font-semibold text-slate-700 transition">${escapeHtml(att.name)}${idTag} <span class="text-[10px] text-indigo-500">(${cnt}회)</span></button>
+              let statusBadge = `<span class="text-[10px] text-slate-400 ml-1">대기</span>`;
+              let chipBg = 'bg-slate-100 border-slate-200/70';
+              if (att.status === 'ontime') {
+                statusBadge = `<span class="text-[10px] font-bold text-emerald-700 ml-1">✓ 정시</span>`;
+                chipBg = 'bg-emerald-50 border-emerald-200';
+              } else if (att.status === 'late') {
+                statusBadge = `<span class="text-[10px] font-bold text-rose-600 ml-1">${att.lateMinutes}분 지각</span>`;
+                chipBg = 'bg-rose-50 border-rose-200';
+              }
+              return `<span class="inline-flex items-center rounded-lg ${chipBg} overflow-hidden border">
+                <button type="button" data-chip-name="${escapeHtml(att.name)}" data-chip-id="${escapeHtml(att.id)}" class="attendee-chip-btn px-2.5 py-1 hover:bg-indigo-100/70 text-xs font-semibold text-slate-700 transition">${escapeHtml(att.name)}${idTag} <span class="text-[10px] text-indigo-500">(${cnt}회)</span>${statusBadge}</button>
                 <button type="button" data-leave-name="${escapeHtml(att.name)}" data-leave-id="${escapeHtml(att.id)}" class="leave-chip-btn px-1.5 py-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="참여 취소">×</button>
               </span>`;
             })
@@ -1838,24 +2098,36 @@ alter publication supabase_realtime add table chat_messages;`;
           settleRecordsList.innerHTML = `<div class="text-xs text-slate-400 py-2 text-center">아직 이 약속에 저장된 지각자가 없습니다.</div>`;
         } else {
           settleRecordsList.innerHTML = mRecords
-            .map(
-              (r) => `
-              <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 flex items-center justify-between gap-2">
-                <div class="min-w-0">
-                  <span class="text-xs font-bold text-slate-900">${escapeHtml(r.name)}</span>
-                  <span class="text-[11px] text-slate-500 ml-1.5">${
-                    r.exempt ? '면제/감면' : `${r.k}회차(${r.mult}배) · ${r.t}분`
-                  }</span>
+            .map((r) => {
+              const ctx = getVoteContext(r);
+              const cardTheme =
+                ctx.status === 'none'
+                  ? 'border-rose-300 bg-rose-50/80'
+                  : ctx.status === 'passed' || ctx.status === 'exempt'
+                  ? 'border-emerald-200 bg-emerald-50/40'
+                  : 'border-amber-200 bg-amber-50/40';
+              return `
+              <div class="rounded-xl border ${cardTheme} px-3 py-2.5">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <span class="text-xs font-bold text-slate-900">${escapeHtml(r.name)}</span>
+                    <span class="text-[11px] text-slate-600 ml-1.5">${
+                      r.exempt ? '면제/감면' : `${r.k}회차(${r.mult}배) · ${r.t}분`
+                    }</span>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <span class="text-xs font-extrabold ${
+                      ctx.status === 'none' ? 'text-rose-600' : r.exempt || ctx.status === 'passed' ? 'text-emerald-600' : 'text-indigo-600'
+                    }">${formatWon(r.total)}</span>
+                    <button type="button" data-del-settle-rec="${r.id}" class="del-settle-rec-btn p-1 rounded text-slate-400 hover:text-rose-600 transition" title="삭제">
+                      <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
-                  <span class="text-xs font-extrabold ${r.exempt ? 'text-emerald-600' : 'text-indigo-600'}">${formatWon(r.total)}</span>
-                  <button type="button" data-del-settle-rec="${r.id}" class="del-settle-rec-btn p-1 rounded text-slate-400 hover:text-rose-600 transition" title="삭제">
-                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                  </button>
-                </div>
+                ${renderVoteBlockHtml(r)}
               </div>
-            `
-            )
+            `;
+            })
             .join('');
         }
 
@@ -1887,6 +2159,202 @@ alter publication supabase_realtime add table chat_messages;`;
         }
         addParticipantToActiveMeetup(userProfile.id, userProfile.name);
       });
+
+      btnToggleManualSettle.addEventListener('click', () => {
+        manualSettleBox.classList.toggle('hidden');
+      });
+
+      async function performCheckinForMeetup(meetupId, viaQr) {
+        const m = meetups.find((x) => x.id === meetupId);
+        if (!m) {
+          if (viaQr) showToast('해당 약속을 찾을 수 없습니다.');
+          return;
+        }
+        if (!userProfile || !userProfile.id) {
+          openProfileModal();
+          showToast('출석 체크하려면 먼저 내 아이디를 설정해 주세요.');
+          return;
+        }
+
+        const cur = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
+        const checkedCount = cur.filter((a) => a.status === 'ontime' || a.status === 'late').length;
+        let myIdx = cur.findIndex((a) => a.id === userProfile.id);
+
+        if (myIdx !== -1 && (cur[myIdx].status === 'ontime' || cur[myIdx].status === 'late')) {
+          showToast('이미 출석 체크가 완료되었습니다.');
+          return;
+        }
+
+        if (!viaQr && checkedCount > 0) {
+          showToast('이미 1등이 출석했습니다! 현장의 출석 QR을 찍어주세요.');
+          return;
+        }
+
+        const nowDt = new Date();
+        const [yy, mm, dd] = (m.date || todayStr).split('-').map(Number);
+        const [hh, mi] = (m.time || '18:00').split(':').map(Number);
+        const scheduledDt = new Date(yy, (mm || 1) - 1, dd || 1, hh || 0, mi || 0, 0, 0);
+        const diffSec = Math.floor((nowDt.getTime() - scheduledDt.getTime()) / 1000);
+        const checkInTime = nowDt.toLocaleTimeString('ko-KR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+
+        let nextAttendees = [...cur];
+        if (myIdx === -1) {
+          nextAttendees.push({
+            id: userProfile.id,
+            name: userProfile.name,
+            status: 'pending',
+            checkInTime: '',
+            lateMinutes: 0,
+          });
+          myIdx = nextAttendees.length - 1;
+        }
+
+        const nextN = nextAttendees.length;
+
+        if (diffSec <= 0) {
+          nextAttendees[myIdx] = {
+            ...nextAttendees[myIdx],
+            status: 'ontime',
+            checkInTime,
+            lateMinutes: 0,
+          };
+          await persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
+          showToast(`${viaQr ? 'QR ' : ''}정시 도착 출석 완료! (${checkInTime})`);
+        } else {
+          const t = Math.ceil(diffSec / 60);
+          const yearStr = (m.date || todayStr).slice(0, 4);
+          const k = getAnnualLateCount(userProfile.name, yearStr, userProfile.id) + 1;
+          const mult = Math.pow(2, k - 1);
+          const total = nextN * (mult * BASE_X + 100 * t);
+
+          nextAttendees[myIdx] = {
+            ...nextAttendees[myIdx],
+            status: 'late',
+            checkInTime,
+            lateMinutes: t,
+          };
+          await persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
+
+          const item = {
+            id: 'r_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            meetupId: m.id,
+            meetupTitle: m.title,
+            memberId: userProfile.id,
+            name: userProfile.name,
+            date: m.date,
+            n: nextN,
+            k,
+            t,
+            x: BASE_X,
+            mult,
+            total,
+            exempt: false,
+            voteStatus: 'none',
+            votes: [],
+          };
+          await persistAddRecord(item);
+          showToast(`${viaQr ? 'QR ' : ''}${t}분 지각 자동 정산: ${formatWon(total)} (${k}회차 · ${mult}배)`);
+        }
+      }
+
+      btnCheckinMe.addEventListener('click', () => {
+        if (!activeMeetupId) return;
+        performCheckinForMeetup(activeMeetupId, false);
+      });
+
+      function buildQrUrl(meetupId) {
+        const ts = Math.floor(Date.now() / 30000);
+        const base = window.location.origin + window.location.pathname;
+        return `${base}?checkin=${encodeURIComponent(meetupId)}&ts=${ts}`;
+      }
+
+      function renderQrCodeImage() {
+        if (!activeMeetupId) return;
+        const url = buildQrUrl(activeMeetupId);
+        qrCodeBox.innerHTML = '';
+        if (window.QRCode) {
+          new window.QRCode(qrCodeBox, {
+            text: url,
+            width: 200,
+            height: 200,
+            colorDark: '#1e1b4b',
+            colorLight: '#ffffff',
+            correctLevel: window.QRCode.CorrectLevel.M,
+          });
+        } else {
+          qrCodeBox.textContent = url;
+        }
+      }
+
+      function openQrModal() {
+        const m = meetups.find((x) => x.id === activeMeetupId);
+        if (!m) return;
+        qrModalSubtitle.textContent = `${m.title} · 뒤에 온 친구가 카메라로 찍으면 바로 출석됩니다.`;
+        qrModal.classList.remove('hidden');
+        renderQrCodeImage();
+        qrCountdown = 30;
+        qrTimerLabel.textContent = `30초마다 보안 코드 자동 갱신 (${qrCountdown}초)`;
+        if (qrRefreshInterval) clearInterval(qrRefreshInterval);
+        qrRefreshInterval = setInterval(() => {
+          qrCountdown -= 1;
+          if (qrCountdown <= 0) {
+            qrCountdown = 30;
+            renderQrCodeImage();
+          }
+          qrTimerLabel.textContent = `30초마다 보안 코드 자동 갱신 (${qrCountdown}초)`;
+        }, 1000);
+      }
+
+      function closeQrModal() {
+        qrModal.classList.add('hidden');
+        if (qrRefreshInterval) {
+          clearInterval(qrRefreshInterval);
+          qrRefreshInterval = null;
+        }
+      }
+
+      btnShowQr.addEventListener('click', openQrModal);
+      btnCloseQrModal.addEventListener('click', closeQrModal);
+      btnDoneQrModal.addEventListener('click', closeQrModal);
+      btnCopyQrLink.addEventListener('click', () => {
+        if (!activeMeetupId) return;
+        copyText(buildQrUrl(activeMeetupId), '출석 QR 링크를 복사했습니다.');
+      });
+
+      async function tryProcessPendingQrCheckin() {
+        if (!pendingQrCheckin) return;
+        if (!DEFAULT_CONFIG.accessPin || pinGate.classList.contains('hidden')) {
+          if (!userProfile || !userProfile.id) {
+            openProfileModal();
+            showToast('QR 출석을 완료하려면 먼저 내 아이디를 설정해 주세요.');
+            return;
+          }
+          const req = pendingQrCheckin;
+          const m = meetups.find((x) => x.id === req.meetupId);
+          if (!m) return; // wait until remote data loads
+
+          pendingQrCheckin = null;
+          selectedDate = m.date;
+          const [y, mo] = m.date.split('-').map(Number);
+          currentYear = y;
+          currentMonth = mo - 1;
+          activeMeetupId = m.id;
+          switchTab('planner');
+          renderAll();
+
+          const nowBucket = Math.floor(Date.now() / 30000);
+          if (req.ts && Math.abs(nowBucket - req.ts) > 3) {
+            showToast('QR 코드 유효시간(약 90초)이 만료되었습니다. 현장의 최신 QR을 다시 찍어주세요.');
+            return;
+          }
+          await performCheckinForMeetup(m.id, true);
+        }
+      }
 
       function handleJoinMeetup() {
         const name = joinMeetupName.value.trim();
@@ -1968,6 +2436,8 @@ alter publication supabase_realtime add table chat_messages;`;
           mult,
           total,
           exempt,
+          voteStatus: exempt ? 'passed' : 'none',
+          votes: [],
         };
         settleName.value = '';
         selectedSettleMemberId = '';
@@ -1976,6 +2446,16 @@ alter publication supabase_realtime add table chat_messages;`;
       });
 
       settleRecordsList.addEventListener('click', (e) => {
+        const startBtn = e.target.closest('.vote-start-btn');
+        if (startBtn) {
+          handleVoteStart(startBtn.getAttribute('data-vote-start'));
+          return;
+        }
+        const toggleBtn = e.target.closest('.vote-toggle-btn');
+        if (toggleBtn) {
+          handleVoteToggle(toggleBtn.getAttribute('data-vote-toggle'));
+          return;
+        }
         const btn = e.target.closest('.del-settle-rec-btn');
         if (!btn) return;
         const id = btn.getAttribute('data-del-settle-rec');
@@ -2176,28 +2656,40 @@ alter publication supabase_realtime add table chat_messages;`;
         }
 
         historyList.innerHTML = records
-          .map(
-            (r) => `
-          <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="font-bold text-slate-900 truncate">${escapeHtml(r.name)}</span>
-                <span class="text-xs text-slate-400">${escapeHtml(r.date)}</span>
-                ${r.meetupTitle ? `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-medium">${escapeHtml(r.meetupTitle)}</span>` : ''}
+          .map((r) => {
+            const ctx = getVoteContext(r);
+            const cardBorder =
+              ctx.status === 'none' && ctx.meetup
+                ? 'border-rose-300 bg-rose-50/60'
+                : ctx.status === 'passed' || ctx.status === 'exempt'
+                ? 'border-emerald-200 bg-white'
+                : 'border-slate-200 bg-white';
+            return `
+          <div class="rounded-2xl border ${cardBorder} p-4 shadow-sm">
+            <div class="flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-bold text-slate-900 truncate">${escapeHtml(r.name)}</span>
+                  <span class="text-xs text-slate-400">${escapeHtml(r.date)}</span>
+                  ${r.meetupTitle ? `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-medium">${escapeHtml(r.meetupTitle)}</span>` : ''}
+                </div>
+                <div class="text-xs text-slate-500 mt-1">
+                  ${r.exempt ? '면제/감면 처리' : `${r.n}명 · ${r.k}회차(${r.mult}배) · ${r.t}분 지각`}
+                </div>
               </div>
-              <div class="text-xs text-slate-500 mt-1">
-                ${r.exempt ? '면제/감면 처리' : `${r.n}명 · ${r.k}회차(${r.mult}배) · ${r.t}분 지각`}
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="font-extrabold ${
+                  ctx.status === 'none' && ctx.meetup ? 'text-rose-600' : r.exempt || ctx.status === 'passed' ? 'text-emerald-600' : 'text-indigo-600'
+                } text-base">${formatWon(r.total)}</span>
+                <button type="button" data-del-id="${r.id}" class="del-record-btn p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="삭제">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
               </div>
             </div>
-            <div class="flex items-center gap-3 shrink-0">
-              <span class="font-extrabold ${r.exempt ? 'text-emerald-600' : 'text-indigo-600'} text-base">${formatWon(r.total)}</span>
-              <button type="button" data-del-id="${r.id}" class="del-record-btn p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="삭제">
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
-              </button>
-            </div>
+            ${renderVoteBlockHtml(r)}
           </div>
-        `
-          )
+        `;
+          })
           .join('');
 
         if (window.lucide) {
@@ -2206,6 +2698,16 @@ alter publication supabase_realtime add table chat_messages;`;
       }
 
       historyList.addEventListener('click', (e) => {
+        const startBtn = e.target.closest('.vote-start-btn');
+        if (startBtn) {
+          handleVoteStart(startBtn.getAttribute('data-vote-start'));
+          return;
+        }
+        const toggleBtn = e.target.closest('.vote-toggle-btn');
+        if (toggleBtn) {
+          handleVoteToggle(toggleBtn.getAttribute('data-vote-toggle'));
+          return;
+        }
         const btn = e.target.closest('.del-record-btn');
         if (!btn) return;
         const id = btn.getAttribute('data-del-id');
@@ -2330,6 +2832,8 @@ alter publication supabase_realtime add table chat_messages;`;
       initSupabase();
       if (!DEFAULT_CONFIG.accessPin && (!userProfile || !userProfile.id)) {
         openProfileModal();
+      } else if (!DEFAULT_CONFIG.accessPin) {
+        tryProcessPendingQrCheckin();
       }
       if (window.lucide) {
         window.lucide.createIcons();

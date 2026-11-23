@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>대앰생회의 지각비 플래너 &amp; 정산소</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    }
+    input[type="range"] {
+      accent-color: #4f46e5;
+    }
+    .tab-active {
+      background-color: #4f46e5;
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen antialiased">
+  <!-- Optional PIN Lock Overlay (only shown if ACCESS_PIN is configured) -->
+  <div id="pin-gate" class="hidden fixed inset-0 z-50 bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 w-full max-w-sm p-6 shadow-2xl space-y-4 text-center">
+      <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-sm">
+        <i data-lucide="lock" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h2 class="text-lg font-bold text-slate-900">대앰생회의 전용 입장</h2>
+        <p class="text-xs text-slate-500 mt-1">친구들끼리 정한 입장 비밀번호를 입력하세요.</p>
+      </div>
+      <div class="space-y-2.5">
+        <input id="pin-input" type="password" inputmode="numeric" placeholder="비밀번호 입력" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-center text-base font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <p id="pin-error" class="hidden text-xs text-rose-600 font-medium">비밀번호가 일치하지 않습니다.</p>
+        <button id="btn-pin-submit" type="button" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition">입장하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+          <i data-lucide="calendar-clock" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900 leading-tight">대앰생회의 지각비 플래너</h1>
+            <button id="btn-open-sync-modal" type="button" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+              <span id="sync-status-dot" class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+              <span id="sync-status-text">로컬 모드</span>
+            </button>
+          </div>
+          <p class="text-xs text-slate-500">제 0회 대앰생회의 공식 기준 · 매년 k 초기화</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center bg-slate-100 p-1 rounded-xl text-xs sm:text-sm font-medium overflow-x-auto max-w-full" aria-label="메뉴">
+        <button id="tab-btn-planner" type="button" class="tab-active px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap">
+          <i data-lucide="calendar-days" class="w-4 h-4"></i>
+          <span>캘린더</span>
+        </button>
+        <button id="tab-btn-calc" type="button" class="text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap">
+          <i data-lucide="calculator" class="w-4 h-4"></i>
+          <span>계산기</span>
+        </button>
+        <button id="tab-btn-history" type="button" class="text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap">
+          <i data-lucide="list-checks" class="w-4 h-4"></i>
+          <span>정산기록</span>
+          <span id="history-count-badge" class="ml-0.5 px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full text-[11px] font-semibold">0</span>
+        </button>
+        <button id="tab-btn-rules" type="button" class="text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap">
+          <i data-lucide="scroll-text" class="w-4 h-4"></i>
+          <span>규정안내</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <!-- SECTION 0: CALENDAR PLANNER -->
+    <section id="view-planner" class="space-y-5">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        <!-- Left: Monthly Calendar -->
+        <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <h2 id="cal-month-label" class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">2026년 11월</h2>
+              <button id="btn-cal-today" type="button" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition">오늘</button>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button id="btn-cal-prev" type="button" class="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition" aria-label="이전 달">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+              </button>
+              <button id="btn-cal-next" type="button" class="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition" aria-label="다음 달">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </button>
+              <button id="btn-open-new-meetup" type="button" class="ml-1 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>약속 만들기</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Weekday Headers -->
+          <div class="grid grid-cols-7 text-center text-xs font-semibold pb-1 border-b border-slate-100">
+            <div class="text-rose-500 py-1">일</div>
+            <div class="text-slate-500 py-1">월</div>
+            <div class="text-slate-500 py-1">화</div>
+            <div class="text-slate-500 py-1">수</div>
+            <div class="text-slate-500 py-1">목</div>
+            <div class="text-slate-500 py-1">금</div>
+            <div class="text-indigo-600 py-1">토</div>
+          </div>
+
+          <!-- Calendar Days Grid -->
+          <div id="cal-grid" class="grid grid-cols-7 gap-1.5"></div>
+
+          <!-- Upcoming / Recent Meetups Quick Strip -->
+          <div class="pt-3 border-t border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold text-slate-500">등록된 약속 목록</span>
+              <span id="total-meetups-count" class="text-xs text-slate-400">0건</span>
+            </div>
+            <div id="meetup-quick-list" class="flex flex-wrap gap-1.5"></div>
+          </div>
+        </div>
+
+        <!-- Right: Selected Day & Meetup Settlement Panel -->
+        <div class="lg:col-span-5 space-y-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4">
+            <div class="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div>
+                <div class="text-xs font-semibold text-indigo-600">선택한 날짜</div>
+                <h3 id="selected-date-label" class="text-base sm:text-lg font-bold text-slate-900">2026년 11월 23일</h3>
+              </div>
+              <button id="btn-add-on-selected" type="button" class="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition flex items-center gap-1">
+                <i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i>
+                <span>이 날 약속 추가</span>
+              </button>
+            </div>
+
+            <!-- Meetups on Selected Date -->
+            <div id="selected-day-meetups" class="space-y-3"></div>
+          </div>
+
+          <!-- Active Meetup Latecomer Settlement Card -->
+          <div id="meetup-settle-panel" class="hidden bg-white rounded-2xl border border-indigo-200 p-4 sm:p-5 shadow-sm space-y-4">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 mb-1">지각자 정산</span>
+                <h4 id="settle-meetup-title" class="text-base font-bold text-slate-900">약속 이름</h4>
+                <p id="settle-meetup-meta" class="text-xs text-slate-500 mt-0.5"></p>
+              </div>
+              <button id="btn-copy-meetup-summary" type="button" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition flex items-center gap-1 shrink-0">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span>정산 공유</span>
+              </button>
+            </div>
+
+            <!-- Attendee Quick Chips -->
+            <div id="settle-attendee-chips-wrap" class="hidden space-y-1.5">
+              <div class="text-xs font-semibold text-slate-600">참석자 빠른 선택 (누르면 올해 누적 k 자동 반영)</div>
+              <div id="settle-attendee-chips" class="flex flex-wrap gap-1.5"></div>
+            </div>
+
+            <!-- Latecomer Form -->
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label for="settle-name" class="block text-[11px] font-semibold text-slate-600 mb-1">지각자 이름</label>
+                  <input id="settle-name" type="text" placeholder="예: 철수" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label for="settle-k" class="block text-[11px] font-semibold text-slate-600 mb-1">올해 누적 횟수 (k)</label>
+                  <div class="flex items-center gap-1.5">
+                    <input id="settle-k" type="number" min="1" max="20" value="1" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    <span id="settle-mult-badge" class="px-2 py-1 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-bold shrink-0">1배</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label for="settle-arrived-time" class="block text-[11px] font-semibold text-slate-600 mb-1">실제 도착 시각 (시:분:초)</label>
+                  <input id="settle-arrived-time" type="time" step="1" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label for="settle-t" class="block text-[11px] font-semibold text-slate-600 mb-1">지각 시간 t (분, 1초 초과 올림)</label>
+                  <input id="settle-t" type="number" min="0" max="600" value="5" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                  <input id="settle-exempt" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                  <span>면제/감면 (천재지변·대중교통 지연·3일전 합의)</span>
+                </label>
+              </div>
+
+              <div class="pt-2 border-t border-slate-200 flex items-center justify-between gap-2">
+                <div>
+                  <div class="text-[11px] text-slate-500">예상 지각비</div>
+                  <div id="settle-preview-amount" class="text-lg font-extrabold text-indigo-600">2,800원</div>
+                </div>
+                <button id="btn-settle-save" type="button" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm flex items-center gap-1.5">
+                  <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                  <span>계산 &amp; 저장</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Meetup's Saved Latecomers List -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-600">이 약속 지각 내역</span>
+                <span id="settle-meetup-total" class="text-xs font-bold text-indigo-600">합계 0원</span>
+              </div>
+              <div id="settle-records-list" class="space-y-2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 1: STANDALONE CALCULATOR -->
+    <section id="view-calc" class="hidden space-y-5 max-w-3xl mx-auto">
+      <div class="bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 rounded-2xl p-5 sm:p-6 text-white shadow-lg">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/15 text-indigo-100 mb-2">
+              <span>적용 공식</span>
+              <span class="font-mono">N × (2^(k-1) · X + 100t)</span>
+            </span>
+            <div class="text-sm text-indigo-100">최종 납부할 지각비</div>
+            <div id="result-total" class="text-3xl sm:text-4xl font-extrabold tracking-tight mt-0.5">2,800원</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-indigo-200">상습 지각 배율</div>
+            <div id="result-multiplier" class="text-xl font-bold mt-0.5">1배 <span class="text-xs font-normal text-indigo-200">(1회차)</span></div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3.5 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p id="result-breakdown" class="text-xs sm:text-sm font-mono text-indigo-100 break-all">
+            4명 × (1배 × 200원 + 100원 × 5분) = 2,800원
+          </p>
+          <div class="flex items-center gap-2 shrink-0">
+            <button id="btn-copy-summary" type="button" class="px-3 py-1.5 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>단톡방 문구 복사</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm space-y-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="input-name" class="block text-xs font-semibold text-slate-600 mb-1.5">지각자 이름 (선택)</label>
+            <input id="input-name" type="text" placeholder="예: 홍길동" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="input-date" class="block text-xs font-semibold text-slate-600 mb-1.5">모임 날짜</label>
+            <input id="input-date" type="date" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <hr class="border-slate-100" />
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label for="input-n" class="text-sm font-semibold text-slate-800">
+              약속 당일 인원수 <span class="text-indigo-600 font-mono">N</span>
+            </label>
+            <div class="flex items-center gap-1.5">
+              <input id="input-n" type="number" min="1" max="50" value="4" class="w-16 text-right px-2 py-1 rounded-lg border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <span class="text-sm text-slate-500">명</span>
+            </div>
+          </div>
+          <input id="slider-n" type="range" min="1" max="15" value="4" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer" />
+          <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+            <span>1명</span>
+            <span>5명</span>
+            <span>10명</span>
+            <span>15명</span>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label for="input-k" class="text-sm font-semibold text-slate-800">
+              올해 누적 지각 횟수 <span class="text-indigo-600 font-mono">k</span>
+            </label>
+            <div class="flex items-center gap-1.5">
+              <input id="input-k" type="number" min="1" max="20" value="1" class="w-16 text-right px-2 py-1 rounded-lg border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <span class="text-sm text-slate-500">회차</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-5 gap-2">
+            <button type="button" data-k="1" class="k-preset-btn py-2 rounded-xl border text-xs font-semibold transition border-indigo-600 bg-indigo-50 text-indigo-700">1회 (1배)</button>
+            <button type="button" data-k="2" class="k-preset-btn py-2 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700">2회 (2배)</button>
+            <button type="button" data-k="3" class="k-preset-btn py-2 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700">3회 (4배)</button>
+            <button type="button" data-k="4" class="k-preset-btn py-2 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700">4회 (8배)</button>
+            <button type="button" data-k="5" class="k-preset-btn py-2 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700">5회 (16배)</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label for="input-t" class="text-sm font-semibold text-slate-800">
+              지각한 시간 <span class="text-indigo-600 font-mono">t</span>
+            </label>
+            <div class="flex items-center gap-1.5">
+              <input id="input-t" type="number" min="0" max="600" value="5" class="w-20 text-right px-2 py-1 rounded-lg border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <span class="text-sm text-slate-500">분</span>
+            </div>
+          </div>
+          <input id="slider-t" type="range" min="0" max="60" value="5" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer" />
+          <div class="flex flex-wrap items-center gap-1.5 mt-2.5">
+            <button type="button" data-add-t="1" class="t-add-btn px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-700 transition">+1분</button>
+            <button type="button" data-add-t="5" class="t-add-btn px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-700 transition">+5분</button>
+            <button type="button" data-add-t="10" class="t-add-btn px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-700 transition">+10분</button>
+            <button type="button" data-add-t="30" class="t-add-btn px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-700 transition">+30분</button>
+            <button id="btn-toggle-time-helper" type="button" class="ml-auto text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+              <i data-lucide="timer" class="w-3.5 h-3.5"></i>
+              <span>시:분:초로 자동 계산</span>
+            </button>
+          </div>
+
+          <div id="time-helper-box" class="hidden mt-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div class="text-xs text-slate-600">
+              약속 정각(<span class="font-semibold">00초</span>)보다 <span class="font-semibold text-rose-600">1초라도 초과</span>하면 지각 처리됩니다. (예: 11:30:01 도착 → 1분 지각으로 올림 적용)
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="helper-scheduled" class="block text-[11px] font-semibold text-slate-500 mb-1">약속 시간 (시:분)</label>
+                <input id="helper-scheduled" type="time" value="11:30" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm bg-white" />
+              </div>
+              <div>
+                <label for="helper-arrived" class="block text-[11px] font-semibold text-slate-500 mb-1">실제 도착 시간 (시:분:초)</label>
+                <input id="helper-arrived" type="time" step="1" value="11:30:01" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm bg-white" />
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <span id="helper-status" class="text-xs font-medium text-slate-700">1초 초과 → 올림 1분 지각</span>
+              <button id="btn-apply-time-helper" type="button" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">t에 적용</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <label for="input-x" class="text-sm font-semibold text-slate-800">기본 지각비 <span class="text-indigo-600 font-mono">X</span></label>
+            <p class="text-xs text-slate-500">규정 기본값 200원 (협의 시 변경 가능)</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="input-x" type="number" min="0" step="100" value="200" class="w-24 text-right px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <span class="text-sm text-slate-500">원</span>
+            <button id="btn-reset-x" type="button" class="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs text-slate-600 transition">기본값</button>
+          </div>
+        </div>
+
+        <div class="pt-2 flex flex-col sm:flex-row gap-2.5">
+          <button id="btn-save-record" type="button" class="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold transition flex items-center justify-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>정산 기록에 저장하기</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: RULES -->
+    <section id="view-rules" class="hidden space-y-4 max-w-3xl mx-auto">
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm space-y-2">
+        <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">제 0회 대앰생회의</div>
+        <h2 class="text-lg font-bold text-slate-900">1. 개요 (도입 취지)</h2>
+        <p class="text-sm text-slate-600 leading-relaxed">
+          모두의 소중한 시간을 보호하고 정시 도착자의 불필요한 대기 시간을 줄이기 위해, 앞으로 매 모임 약속 시간 정각까지 지정된 약속 장소에 도착하지 못할 경우 지각비 공식에 따라 지각비를 걷어 공금으로 활용합니다.
+        </p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm space-y-4">
+        <h2 class="text-lg font-bold text-slate-900">2. 지각비 공식 및 상습 지각 배율</h2>
+        <div class="p-4 rounded-xl bg-slate-900 text-white text-center font-mono text-base sm:text-lg tracking-wide">
+          지각비 = N × (2^(k-1) · X + 100t)
+        </div>
+        <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-sm text-slate-700">
+          <li class="p-2.5 rounded-xl bg-slate-50 border border-slate-100"><span class="font-mono font-bold text-indigo-600">N</span> : 약속 당일 인원수 (명)</li>
+          <li class="p-2.5 rounded-xl bg-slate-50 border border-slate-100"><span class="font-mono font-bold text-indigo-600">k</span> : 지각 횟수 (올해 누적)</li>
+          <li class="p-2.5 rounded-xl bg-slate-50 border border-slate-100"><span class="font-mono font-bold text-indigo-600">X</span> : 기본 지각비 (200원)</li>
+          <li class="p-2.5 rounded-xl bg-slate-50 border border-slate-100"><span class="font-mono font-bold text-indigo-600">t</span> : 지각한 시간 (분)</li>
+        </ul>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs text-slate-500">
+                <th class="py-2 pr-3">올해 지각 횟수 (k)</th>
+                <th class="py-2 px-3">배율 2^(k-1)</th>
+                <th class="py-2 pl-3">기본금 (2^(k-1) × 200원)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700">
+              <tr><td class="py-2 pr-3 font-medium">1회차</td><td class="py-2 px-3">1배</td><td class="py-2 pl-3">200원</td></tr>
+              <tr><td class="py-2 pr-3 font-medium">2회차</td><td class="py-2 px-3">2배</td><td class="py-2 pl-3">400원</td></tr>
+              <tr><td class="py-2 pr-3 font-medium">3회차</td><td class="py-2 px-3">4배</td><td class="py-2 pl-3">800원</td></tr>
+              <tr><td class="py-2 pr-3 font-medium">4회차</td><td class="py-2 px-3">8배</td><td class="py-2 pl-3">1,600원</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs text-slate-500 bg-amber-50 border border-amber-200/70 rounded-xl p-3 text-amber-900">
+          매해마다 누적 지각 횟수(k)를 초기화하여 상습 지각범의 파산을 방지하고 지속 가능한 지각비 제도를 유지합니다.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-2">
+          <h3 class="font-bold text-slate-900 flex items-center gap-1.5">
+            <i data-lucide="alarm-clock" class="w-4 h-4 text-indigo-600"></i>
+            <span>3. 도착 인정 기준</span>
+          </h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            약속 시간 정각(00초)까지만 도착을 인정하며, <strong class="text-rose-600">1초라도 초과할 경우 지각</strong>으로 처리합니다.
+          </p>
+          <p class="text-xs text-slate-500">예: 11시 30분 약속 시 11:30:00까지 인정 / 11:30:01부터 지각</p>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-2">
+          <h3 class="font-bold text-slate-900 flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+            <span>4. 면제 및 감면 조건</span>
+          </h3>
+          <ul class="text-sm text-slate-600 space-y-1 list-disc list-inside">
+            <li>천재지변</li>
+            <li>대중교통 공식 지연 (증명자료 첨부 필수)</li>
+            <li>사전 통보 (약속일로부터 3일 전 합의 시)</li>
+          </ul>
+          <p class="text-xs text-rose-600 font-medium pt-1">그 외(늦잠, 준비 지연 등) 사유는 예외 없음</p>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-2">
+          <h3 class="font-bold text-slate-900 flex items-center gap-1.5">
+            <i data-lucide="wallet" class="w-4 h-4 text-indigo-600"></i>
+            <span>5. 납부 기한 및 사용처</span>
+          </h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            지각 확정 후 <strong>7일 내</strong> 공금관리계좌로 입금합니다. 모인 공금은 특정인이 아닌 모임 전체(식비·노래방비 보탬, 다음 모임 N빵 차감 등)에 사용합니다.
+          </p>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-2">
+          <h3 class="font-bold text-slate-900 flex items-center gap-1.5">
+            <i data-lucide="users" class="w-4 h-4 text-indigo-600"></i>
+            <span>6. 적용 시점 및 개정</span>
+          </h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            공지 이후 다음 약속일부터 적용되며, 단톡방 투표나 이모지 반응 등으로 참석 인원 전원 합의를 남깁니다. 위 내용은 언제나 협의로 바뀔 수 있습니다.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: HISTORY -->
+    <section id="view-history" class="hidden space-y-4 max-w-3xl mx-auto">
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div id="history-storage-label" class="text-xs font-semibold text-slate-500">누적 기록된 지각비 (로컬 저장)</div>
+          <div id="history-total-amount" class="text-2xl font-extrabold text-indigo-600 mt-0.5">0원</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-export-history" type="button" class="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition flex items-center gap-1.5">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>전체 내역 복사</span>
+          </button>
+          <button id="btn-clear-history" type="button" class="px-3 py-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-xs font-semibold text-rose-600 transition">전체 삭제</button>
+        </div>
+      </div>
+
+      <div id="history-k-summary-card" class="hidden bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-2">
+        <div class="text-xs font-semibold text-slate-600">올해 인원별 누적 지각 횟수 (k) 현황</div>
+        <div id="history-k-summary" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <div id="history-list" class="space-y-2.5"></div>
+    </section>
+  </main>
+
+  <!-- Modal: Create New Meetup -->
+  <div id="meetup-modal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 w-full max-w-md p-5 sm:p-6 shadow-xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base sm:text-lg font-bold text-slate-900">새 약속 만들기</h3>
+        <button id="btn-close-meetup-modal" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label for="modal-meetup-title" class="block text-xs font-semibold text-slate-600 mb-1">약속 이름</label>
+          <input id="modal-meetup-title" type="text" placeholder="예: 강남역 고기 모임" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="modal-meetup-date" class="block text-xs font-semibold text-slate-600 mb-1">날짜</label>
+            <input id="modal-meetup-date" type="date" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="modal-meetup-time" class="block text-xs font-semibold text-slate-600 mb-1">약속 시간</label>
+            <input id="modal-meetup-time" type="time" value="18:00" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2">
+            <label for="modal-meetup-place" class="block text-xs font-semibold text-slate-600 mb-1">약속 장소 (선택)</label>
+            <input id="modal-meetup-place" type="text" placeholder="예: 강남역 11번 출구" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="modal-meetup-n" class="block text-xs font-semibold text-slate-600 mb-1">인원수 (N)</label>
+            <input id="modal-meetup-n" type="number" min="1" max="50" value="4" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div>
+          <label for="modal-meetup-attendees" class="block text-xs font-semibold text-slate-600 mb-1">참석 친구 이름 (쉼표로 구분, 선택)</label>
+          <input id="modal-meetup-attendees" type="text" placeholder="예: 철수, 영희, 민수, 지수" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <p class="text-[11px] text-slate-400 mt-1">이름을 입력하면 인원수(N)가 자동 반영되고 정산 시 클릭만으로 선택할 수 있어요.</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button id="btn-cancel-meetup-modal" type="button" class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs sm:text-sm font-semibold text-slate-700 transition">취소</button>
+        <button id="btn-save-meetup-modal" type="button" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm">약속 저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Realtime Sync (Supabase) Settings -->
+  <div id="sync-modal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 w-full max-w-lg p-5 sm:p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-base sm:text-lg font-bold text-slate-900">실시간 공유 DB 설정 (Supabase)</h3>
+          <p class="text-xs text-slate-500">연결하면 친구들과 약속·정산 내역이 실시간으로 동기화됩니다.</p>
+        </div>
+        <button id="btn-close-sync-modal" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label for="sync-url" class="block text-xs font-semibold text-slate-600 mb-1">Supabase Project URL</label>
+          <input id="sync-url" type="url" placeholder="https://xxxxx.supabase.co" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label for="sync-key" class="block text-xs font-semibold text-slate-600 mb-1">Supabase Anon Public Key</label>
+          <input id="sync-key" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label for="sync-room" class="block text-xs font-semibold text-slate-600 mb-1">모임방 코드 (Room ID)</label>
+          <input id="sync-room" type="text" value="daemsaeng-main" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+      </div>
+
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-700">1회용 Supabase 테이블 생성 SQL</span>
+          <button id="btn-copy-sql" type="button" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-indigo-600 transition flex items-center gap-1">
+            <i data-lucide="copy" class="w-3 h-3"></i>
+            <span>SQL 복사</span>
+          </button>
+        </div>
+        <p class="text-[11px] text-slate-500">Supabase 대시보드 → SQL Editor에 한 번만 붙여넣고 Run 하세요. (GitHub에 올릴 땐 코드 상단 DEFAULT_CONFIG에 URL/Key를 직접 적어두면 친구들은 설정 없이 바로 접속됩니다.)</p>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+        <button id="btn-disconnect-sync" type="button" class="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-600 transition">로컬 모드로 전환</button>
+        <div class="flex items-center gap-2">
+          <button id="btn-cancel-sync-modal" type="button" class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs sm:text-sm font-semibold text-slate-700 transition">닫기</button>
+          <button id="btn-save-sync-modal" type="button" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition shadow-sm">연결 및 동기화</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-medium shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50">
+    복사되었습니다.
+  </div>
+
+  <script>
+    (function () {
+      // =========================================================================
+      // [배포 전 설정] GitHub Pages에 올릴 때 아래에 Supabase 정보를 적어두면
+      // 친구들이 별도 설정 없이 접속하자마자 실시간으로 같은 데이터를 공유합니다.
+      // =========================================================================
+      const DEFAULT_CONFIG = {
+        supabaseUrl: '',      // 예: 'https://abcdefg.supabase.co'
+        supabaseAnonKey: '',  // 예: 'eyJhbGciOi...'
+        roomId: 'horse',
+        accessPin: '',        // 선택: 예: '0420' (비워두면 비밀번호 없이 바로 입장)
+      };
+
+      const STORAGE_KEY_RECORDS = 'daemsaeng_late_fee_records_v1';
+      const STORAGE_KEY_MEETUPS = 'daemsaeng_meetups_v1';
+      const STORAGE_KEY_SYNC = 'daemsaeng_sync_config_v1';
+      const BASE_X = 200;
+
+      const SETUP_SQL = `create table if not exists meetups (
+  id text primary key,
+  room_id text not null,
+  title text not null,
+  date text not null,
+  time text not null,
+  place text default '',
+  n integer not null default 4,
+  attendees jsonb default '[]'::jsonb,
+  created_at timestamptz default now()
+);
+
+create table if not exists late_records (
+  id text primary key,
+  room_id text not null,
+  meetup_id text,
+  meetup_title text default '',
+  name text not null,
+  date text not null,
+  n integer not null,
+  k integer not null,
+  t integer not null,
+  x integer not null default 200,
+  mult integer not null,
+  total integer not null,
+  exempt boolean not null default false,
+  created_at timestamptz default now()
+);
+
+alter table meetups enable row level security;
+alter table late_records enable row level security;
+
+create policy "Allow all for meetups" on meetups for all using (true) with check (true);
+create policy "Allow all for late_records" on late_records for all using (true) with check (true);
+
+alter publication supabase_realtime add table meetups;
+alter publication supabase_realtime add table late_records;`;
+
+      // Navigation elements
+      const tabBtns = {
+        planner: document.getElementById('tab-btn-planner'),
+        calc: document.getElementById('tab-btn-calc'),
+        history: document.getElementById('tab-btn-history'),
+        rules: document.getElementById('tab-btn-rules'),
+      };
+      const views = {
+        planner: document.getElementById('view-planner'),
+        calc: document.getElementById('view-calc'),
+        history: document.getElementById('view-history'),
+        rules: document.getElementById('view-rules'),
+      };
+
+      // PIN Gate
+      const pinGate = document.getElementById('pin-gate');
+      const pinInput = document.getElementById('pin-input');
+      const pinError = document.getElementById('pin-error');
+      const btnPinSubmit = document.getElementById('btn-pin-submit');
+
+      // Sync elements
+      const btnOpenSyncModal = document.getElementById('btn-open-sync-modal');
+      const syncStatusDot = document.getElementById('sync-status-dot');
+      const syncStatusText = document.getElementById('sync-status-text');
+      const syncModal = document.getElementById('sync-modal');
+      const btnCloseSyncModal = document.getElementById('btn-close-sync-modal');
+      const btnCancelSyncModal = document.getElementById('btn-cancel-sync-modal');
+      const btnSaveSyncModal = document.getElementById('btn-save-sync-modal');
+      const btnDisconnectSync = document.getElementById('btn-disconnect-sync');
+      const btnCopySql = document.getElementById('btn-copy-sql');
+      const syncUrlInput = document.getElementById('sync-url');
+      const syncKeyInput = document.getElementById('sync-key');
+      const syncRoomInput = document.getElementById('sync-room');
+      const historyStorageLabel = document.getElementById('history-storage-label');
+
+      // Calendar & Planner elements
+      const calMonthLabel = document.getElementById('cal-month-label');
+      const calGrid = document.getElementById('cal-grid');
+      const btnCalPrev = document.getElementById('btn-cal-prev');
+      const btnCalNext = document.getElementById('btn-cal-next');
+      const btnCalToday = document.getElementById('btn-cal-today');
+      const btnOpenNewMeetup = document.getElementById('btn-open-new-meetup');
+      const btnAddOnSelected = document.getElementById('btn-add-on-selected');
+      const selectedDateLabel = document.getElementById('selected-date-label');
+      const selectedDayMeetups = document.getElementById('selected-day-meetups');
+      const meetupQuickList = document.getElementById('meetup-quick-list');
+      const totalMeetupsCount = document.getElementById('total-meetups-count');
+
+      // Settle Panel elements
+      const meetupSettlePanel = document.getElementById('meetup-settle-panel');
+      const settleMeetupTitle = document.getElementById('settle-meetup-title');
+      const settleMeetupMeta = document.getElementById('settle-meetup-meta');
+      const btnCopyMeetupSummary = document.getElementById('btn-copy-meetup-summary');
+      const settleAttendeeChipsWrap = document.getElementById('settle-attendee-chips-wrap');
+      const settleAttendeeChips = document.getElementById('settle-attendee-chips');
+      const settleName = document.getElementById('settle-name');
+      const settleK = document.getElementById('settle-k');
+      const settleMultBadge = document.getElementById('settle-mult-badge');
+      const settleArrivedTime = document.getElementById('settle-arrived-time');
+      const settleT = document.getElementById('settle-t');
+      const settleExempt = document.getElementById('settle-exempt');
+      const settlePreviewAmount = document.getElementById('settle-preview-amount');
+      const btnSettleSave = document.getElementById('btn-settle-save');
+      const settleMeetupTotal = document.getElementById('settle-meetup-total');
+      const settleRecordsList = document.getElementById('settle-records-list');
+
+      // Meetup Modal elements
+      const meetupModal = document.getElementById('meetup-modal');
+      const btnCloseMeetupModal = document.getElementById('btn-close-meetup-modal');
+      const btnCancelMeetupModal = document.getElementById('btn-cancel-meetup-modal');
+      const btnSaveMeetupModal = document.getElementById('btn-save-meetup-modal');
+      const modalMeetupTitle = document.getElementById('modal-meetup-title');
+      const modalMeetupDate = document.getElementById('modal-meetup-date');
+      const modalMeetupTime = document.getElementById('modal-meetup-time');
+      const modalMeetupPlace = document.getElementById('modal-meetup-place');
+      const modalMeetupN = document.getElementById('modal-meetup-n');
+      const modalMeetupAttendees = document.getElementById('modal-meetup-attendees');
+
+      // Standalone Calculator elements
+      const inputName = document.getElementById('input-name');
+      const inputDate = document.getElementById('input-date');
+      const inputN = document.getElementById('input-n');
+      const sliderN = document.getElementById('slider-n');
+      const inputK = document.getElementById('input-k');
+      const inputT = document.getElementById('input-t');
+      const sliderT = document.getElementById('slider-t');
+      const inputX = document.getElementById('input-x');
+      const btnResetX = document.getElementById('btn-reset-x');
+      const resultTotal = document.getElementById('result-total');
+      const resultMultiplier = document.getElementById('result-multiplier');
+      const resultBreakdown = document.getElementById('result-breakdown');
+      const btnCopySummary = document.getElementById('btn-copy-summary');
+      const btnSaveRecord = document.getElementById('btn-save-record');
+      const btnToggleTimeHelper = document.getElementById('btn-toggle-time-helper');
+      const timeHelperBox = document.getElementById('time-helper-box');
+      const helperScheduled = document.getElementById('helper-scheduled');
+      const helperArrived = document.getElementById('helper-arrived');
+      const helperStatus = document.getElementById('helper-status');
+      const btnApplyTimeHelper = document.getElementById('btn-apply-time-helper');
+
+      // History elements
+      const historyCountBadge = document.getElementById('history-count-badge');
+      const historyTotalAmount = document.getElementById('history-total-amount');
+      const historyKSummaryCard = document.getElementById('history-k-summary-card');
+      const historyKSummary = document.getElementById('history-k-summary');
+      const historyList = document.getElementById('history-list');
+      const btnExportHistory = document.getElementById('btn-export-history');
+      const btnClearHistory = document.getElementById('btn-clear-history');
+      const toastEl = document.getElementById('toast');
+
+      // State
+      const now = new Date();
+      const todayStr = toYMD(now);
+      let currentYear = now.getFullYear();
+      let currentMonth = now.getMonth();
+      let selectedDate = todayStr;
+      let activeMeetupId = null;
+      let toastTimer = null;
+
+      let records = loadJson(STORAGE_KEY_RECORDS, []);
+      let meetups = loadJson(STORAGE_KEY_MEETUPS, []);
+      let syncConfig = loadSyncConfig();
+      let sbClient = null;
+      let sbChannel = null;
+
+      inputDate.value = todayStr;
+
+      // PIN Gate check
+      if (DEFAULT_CONFIG.accessPin) {
+        pinGate.classList.remove('hidden');
+        const checkPin = () => {
+          if (pinInput.value === DEFAULT_CONFIG.accessPin) {
+            pinGate.classList.add('hidden');
+            pinError.classList.add('hidden');
+          } else {
+            pinError.classList.remove('hidden');
+          }
+        };
+        btnPinSubmit.addEventListener('click', checkPin);
+        pinInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') checkPin();
+        });
+      }
+
+      function toYMD(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+
+      function formatKoreanDate(ymd) {
+        const [y, m, d] = ymd.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        const days = ['일', '월', '화', '수', '목', '금', '토'];
+        return `${y}년 ${m}월 ${d}일 (${days[dateObj.getDay()]})`;
+      }
+
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.remove('opacity-0');
+        toastEl.classList.add('opacity-100');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toastEl.classList.remove('opacity-100');
+          toastEl.classList.add('opacity-0');
+        }, 2400);
+      }
+
+      function copyText(text, msg) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(
+            () => showToast(msg || '복사되었습니다.'),
+            () => fallbackCopy(text, msg)
+          );
+        } else {
+          fallbackCopy(text, msg);
+        }
+      }
+
+      function fallbackCopy(text, msg) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showToast(msg || '복사되었습니다.');
+        } catch (e) {
+          showToast('복사에 실패했습니다.');
+        }
+        document.body.removeChild(ta);
+      }
+
+      function loadJson(key, fallback) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : fallback;
+        } catch (e) {
+          return fallback;
+        }
+      }
+
+      function loadSyncConfig() {
+        if (DEFAULT_CONFIG.supabaseUrl && DEFAULT_CONFIG.supabaseAnonKey) {
+          return {
+            url: DEFAULT_CONFIG.supabaseUrl,
+            key: DEFAULT_CONFIG.supabaseAnonKey,
+            roomId: DEFAULT_CONFIG.roomId || 'daemsaeng-main',
+          };
+        }
+        return loadJson(STORAGE_KEY_SYNC, { url: '', key: '', roomId: 'daemsaeng-main' });
+      }
+
+      function setSyncBadge(connected) {
+        if (connected) {
+          syncStatusDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500';
+          syncStatusText.textContent = '실시간 동기화 중';
+          historyStorageLabel.textContent = '누적 기록된 지각비 (친구들과 실시간 공유 DB)';
+        } else {
+          syncStatusDot.className = 'w-1.5 h-1.5 rounded-full bg-slate-400';
+          syncStatusText.textContent = '로컬 모드';
+          historyStorageLabel.textContent = '누적 기록된 지각비 (이 기기 브라우저 저장)';
+        }
+      }
+
+      async function initSupabase() {
+        if (sbChannel && sbClient) {
+          try { await sbClient.removeChannel(sbChannel); } catch (e) {}
+          sbChannel = null;
+        }
+        sbClient = null;
+
+        if (!syncConfig.url || !syncConfig.key || !window.supabase) {
+          setSyncBadge(false);
+          return false;
+        }
+
+        try {
+          sbClient = window.supabase.createClient(syncConfig.url, syncConfig.key);
+          await fetchRemoteData();
+
+          sbChannel = sbClient
+            .channel('daemsaeng-sync-' + syncConfig.roomId)
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'meetups', filter: `room_id=eq.${syncConfig.roomId}` },
+              () => { fetchRemoteData(); }
+            )
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'late_records', filter: `room_id=eq.${syncConfig.roomId}` },
+              () => { fetchRemoteData(); }
+            )
+            .subscribe();
+
+          setSyncBadge(true);
+          return true;
+        } catch (e) {
+          sbClient = null;
+          setSyncBadge(false);
+          return false;
+        }
+      }
+
+      async function fetchRemoteData() {
+        if (!sbClient) return;
+        try {
+          const [mRes, rRes] = await Promise.all([
+            sbClient
+              .from('meetups')
+              .select('*')
+              .eq('room_id', syncConfig.roomId)
+              .order('date', { ascending: true }),
+            sbClient
+              .from('late_records')
+              .select('*')
+              .eq('room_id', syncConfig.roomId)
+              .order('created_at', { ascending: false }),
+          ]);
+
+          if (mRes.error || rRes.error) {
+            throw mRes.error || rRes.error;
+          }
+
+          meetups = (mRes.data || []).map((m) => ({
+            id: m.id,
+            title: m.title,
+            date: m.date,
+            time: m.time,
+            place: m.place || '',
+            n: m.n,
+            attendees: Array.isArray(m.attendees) ? m.attendees : [],
+          }));
+
+          records = (rRes.data || []).map((r) => ({
+            id: r.id,
+            meetupId: r.meetup_id || null,
+            meetupTitle: r.meetup_title || '',
+            name: r.name,
+            date: r.date,
+            n: r.n,
+            k: r.k,
+            t: r.t,
+            x: r.x,
+            mult: r.mult,
+            total: r.total,
+            exempt: !!r.exempt,
+          }));
+
+          renderAll();
+        } catch (e) {
+          showToast('DB 데이터를 불러오지 못했습니다. SQL 테이블 설정을 확인하세요.');
+        }
+      }
+
+      async function persistAddMeetup(newMeetup) {
+        meetups = [...meetups, newMeetup];
+        try {
+          localStorage.setItem(STORAGE_KEY_MEETUPS, JSON.stringify(meetups));
+        } catch (e) {}
+        renderAll();
+
+        if (sbClient) {
+          try {
+            const { error } = await sbClient.from('meetups').insert({
+              id: newMeetup.id,
+              room_id: syncConfig.roomId,
+              title: newMeetup.title,
+              date: newMeetup.date,
+              time: newMeetup.time,
+              place: newMeetup.place || '',
+              n: newMeetup.n,
+              attendees: newMeetup.attendees || [],
+            });
+            if (error) throw error;
+          } catch (e) {
+            showToast('원격 DB 저장에 실패했습니다.');
+          }
+        }
+      }
+
+      async function persistDeleteMeetup(id) {
+        meetups = meetups.filter((m) => m.id !== id);
+        try {
+          localStorage.setItem(STORAGE_KEY_MEETUPS, JSON.stringify(meetups));
+        } catch (e) {}
+        renderAll();
+
+        if (sbClient) {
+          try {
+            await sbClient.from('meetups').delete().eq('id', id).eq('room_id', syncConfig.roomId);
+          } catch (e) {}
+        }
+      }
+
+      async function persistAddRecord(item) {
+        records = [item, ...records];
+        try {
+          localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(records));
+        } catch (e) {}
+        renderAll();
+
+        if (sbClient) {
+          try {
+            const { error } = await sbClient.from('late_records').insert({
+              id: item.id,
+              room_id: syncConfig.roomId,
+              meetup_id: item.meetupId || null,
+              meetup_title: item.meetupTitle || '',
+              name: item.name,
+              date: item.date,
+              n: item.n,
+              k: item.k,
+              t: item.t,
+              x: item.x,
+              mult: item.mult,
+              total: item.total,
+              exempt: !!item.exempt,
+            });
+            if (error) throw error;
+          } catch (e) {
+            showToast('원격 DB 기록 저장에 실패했습니다.');
+          }
+        }
+      }
+
+      async function persistDeleteRecord(id) {
+        records = records.filter((r) => r.id !== id);
+        try {
+          localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(records));
+        } catch (e) {}
+        renderAll();
+
+        if (sbClient) {
+          try {
+            await sbClient.from('late_records').delete().eq('id', id).eq('room_id', syncConfig.roomId);
+          } catch (e) {}
+        }
+      }
+
+      async function persistClearRecords() {
+        records = [];
+        try {
+          localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify([]));
+        } catch (e) {}
+        renderAll();
+
+        if (sbClient) {
+          try {
+            await sbClient.from('late_records').delete().eq('room_id', syncConfig.roomId);
+          } catch (e) {}
+        }
+      }
+
+      function renderAll() {
+        renderCalendar();
+        renderSelectedDay();
+        renderSettlePanel();
+        renderHistory();
+      }
+
+      function formatWon(num) {
+        return Number(num).toLocaleString('ko-KR') + '원';
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function getAnnualLateCount(name, yearStr) {
+        if (!name || !name.trim()) return 0;
+        const target = name.trim();
+        return records.filter(
+          (r) =>
+            !r.exempt &&
+            r.name &&
+            r.name.trim() === target &&
+            (r.date || '').startsWith(yearStr)
+        ).length;
+      }
+
+      // Sync Modal Events
+      btnOpenSyncModal.addEventListener('click', () => {
+        syncUrlInput.value = syncConfig.url || '';
+        syncKeyInput.value = syncConfig.key || '';
+        syncRoomInput.value = syncConfig.roomId || 'daemsaeng-main';
+        syncModal.classList.remove('hidden');
+      });
+      const closeSyncModal = () => syncModal.classList.add('hidden');
+      btnCloseSyncModal.addEventListener('click', closeSyncModal);
+      btnCancelSyncModal.addEventListener('click', closeSyncModal);
+
+      btnCopySql.addEventListener('click', () => {
+        copyText(SETUP_SQL, 'Supabase 테이블 생성 SQL을 복사했습니다.');
+      });
+
+      btnSaveSyncModal.addEventListener('click', async () => {
+        const url = syncUrlInput.value.trim();
+        const key = syncKeyInput.value.trim();
+        const roomId = syncRoomInput.value.trim() || 'daemsaeng-main';
+        if (!url || !key) {
+          showToast('Supabase URL과 Anon Key를 모두 입력해 주세요.');
+          return;
+        }
+        syncConfig = { url, key, roomId };
+        try {
+          localStorage.setItem(STORAGE_KEY_SYNC, JSON.stringify(syncConfig));
+        } catch (e) {}
+        const ok = await initSupabase();
+        closeSyncModal();
+        showToast(ok ? '실시간 공유 DB에 연결되었습니다!' : '연결에 실패했습니다. URL/Key를 확인하세요.');
+      });
+
+      btnDisconnectSync.addEventListener('click', async () => {
+        syncConfig = { url: '', key: '', roomId: 'daemsaeng-main' };
+        try {
+          localStorage.setItem(STORAGE_KEY_SYNC, JSON.stringify(syncConfig));
+        } catch (e) {}
+        await initSupabase();
+        records = loadJson(STORAGE_KEY_RECORDS, []);
+        meetups = loadJson(STORAGE_KEY_MEETUPS, []);
+        renderAll();
+        closeSyncModal();
+        showToast('로컬 모드로 전환했습니다.');
+      });
+
+      // Tab Switching
+      function switchTab(name) {
+        Object.keys(views).forEach((key) => {
+          if (key === name) {
+            views[key].classList.remove('hidden');
+            tabBtns[key].classList.add('tab-active');
+            tabBtns[key].classList.remove('text-slate-600', 'hover:text-slate-900');
+          } else {
+            views[key].classList.add('hidden');
+            tabBtns[key].classList.remove('tab-active');
+            tabBtns[key].classList.add('text-slate-600', 'hover:text-slate-900');
+          }
+        });
+      }
+
+      tabBtns.planner.addEventListener('click', () => switchTab('planner'));
+      tabBtns.calc.addEventListener('click', () => switchTab('calc'));
+      tabBtns.history.addEventListener('click', () => switchTab('history'));
+      tabBtns.rules.addEventListener('click', () => switchTab('rules'));
+
+      // ================== CALENDAR & PLANNER ==================
+      function renderCalendar() {
+        calMonthLabel.textContent = `${currentYear}년 ${currentMonth + 1}월`;
+        const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+        let cellsHtml = '';
+        for (let i = 0; i < firstDay; i++) {
+          cellsHtml += `<div class="h-14 sm:h-16 rounded-xl bg-slate-50/60"></div>`;
+        }
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const ymd = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const dayOfWeek = (firstDay + day - 1) % 7;
+          const isToday = ymd === todayStr;
+          const isSelected = ymd === selectedDate;
+          const dayMeetups = meetups.filter((m) => m.date === ymd);
+
+          let textColor = 'text-slate-800';
+          if (dayOfWeek === 0) textColor = 'text-rose-500';
+          else if (dayOfWeek === 6) textColor = 'text-indigo-600';
+
+          let cellClasses =
+            'cal-day-btn h-14 sm:h-16 rounded-xl border p-1 sm:p-1.5 flex flex-col items-start justify-between text-left transition relative cursor-pointer ';
+          if (isSelected) {
+            cellClasses += 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/30';
+          } else if (isToday) {
+            cellClasses += 'border-indigo-300 bg-white hover:bg-slate-50';
+          } else {
+            cellClasses += 'border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50';
+          }
+
+          let badgeHtml = '';
+          if (dayMeetups.length > 0) {
+            const firstTitle = escapeHtml(dayMeetups[0].title);
+            const extra = dayMeetups.length > 1 ? ` +${dayMeetups.length - 1}` : '';
+            badgeHtml = `<span class="w-full truncate px-1 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-semibold leading-none">${firstTitle}${extra}</span>`;
+          }
+
+          const todayDot = isToday
+            ? `<span class="w-1.5 h-1.5 rounded-full bg-indigo-600 inline-block ml-1"></span>`
+            : '';
+
+          cellsHtml += `
+            <button type="button" data-ymd="${ymd}" class="${cellClasses}">
+              <span class="text-xs font-bold ${textColor} flex items-center">${day}${todayDot}</span>
+              ${badgeHtml}
+            </button>
+          `;
+        }
+
+        calGrid.innerHTML = cellsHtml;
+
+        totalMeetupsCount.textContent = `${meetups.length}건`;
+        if (meetups.length === 0) {
+          meetupQuickList.innerHTML = `<span class="text-xs text-slate-400">아직 등록된 약속이 없습니다. '약속 만들기'를 눌러 추가해 보세요.</span>`;
+        } else {
+          const sorted = [...meetups].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+          meetupQuickList.innerHTML = sorted
+            .map((m) => {
+              const isAct = m.id === activeMeetupId;
+              return `
+                <button type="button" data-jump-meetup="${m.id}" class="px-2.5 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${
+                  isAct
+                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                }">
+                  <span class="text-[11px] text-slate-400">${m.date.slice(5)}</span>
+                  <span class="font-semibold">${escapeHtml(m.title)}</span>
+                </button>
+              `;
+            })
+            .join('');
+        }
+      }
+
+      calGrid.addEventListener('click', (e) => {
+        const btn = e.target.closest('.cal-day-btn');
+        if (!btn) return;
+        selectedDate = btn.getAttribute('data-ymd');
+        const dayMeetups = meetups.filter((m) => m.date === selectedDate);
+        activeMeetupId = dayMeetups.length > 0 ? dayMeetups[0].id : null;
+        renderCalendar();
+        renderSelectedDay();
+        renderSettlePanel();
+      });
+
+      meetupQuickList.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-jump-meetup]');
+        if (!btn) return;
+        const id = btn.getAttribute('data-jump-meetup');
+        const m = meetups.find((x) => x.id === id);
+        if (!m) return;
+        selectedDate = m.date;
+        const [y, mo] = m.date.split('-').map(Number);
+        currentYear = y;
+        currentMonth = mo - 1;
+        activeMeetupId = m.id;
+        renderCalendar();
+        renderSelectedDay();
+        renderSettlePanel();
+      });
+
+      btnCalPrev.addEventListener('click', () => {
+        currentMonth -= 1;
+        if (currentMonth < 0) {
+          currentMonth = 11;
+          currentYear -= 1;
+        }
+        renderCalendar();
+      });
+
+      btnCalNext.addEventListener('click', () => {
+        currentMonth += 1;
+        if (currentMonth > 11) {
+          currentMonth = 0;
+          currentYear += 1;
+        }
+        renderCalendar();
+      });
+
+      btnCalToday.addEventListener('click', () => {
+        currentYear = now.getFullYear();
+        currentMonth = now.getMonth();
+        selectedDate = todayStr;
+        const dayMeetups = meetups.filter((m) => m.date === selectedDate);
+        activeMeetupId = dayMeetups.length > 0 ? dayMeetups[0].id : null;
+        renderCalendar();
+        renderSelectedDay();
+        renderSettlePanel();
+      });
+
+      function renderSelectedDay() {
+        selectedDateLabel.textContent = formatKoreanDate(selectedDate);
+        const dayMeetups = meetups.filter((m) => m.date === selectedDate);
+
+        if (dayMeetups.length === 0) {
+          selectedDayMeetups.innerHTML = `
+            <div class="rounded-xl border border-dashed border-slate-200 p-5 text-center space-y-2">
+              <p class="text-xs sm:text-sm text-slate-500">이 날짜에 등록된 약속이 없습니다.</p>
+              <button type="button" id="btn-empty-add-meetup" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">
+                + 약속 만들고 지각비 정산하기
+              </button>
+            </div>
+          `;
+          const emptyBtn = document.getElementById('btn-empty-add-meetup');
+          if (emptyBtn) {
+            emptyBtn.addEventListener('click', () => openMeetupModal(selectedDate));
+          }
+          return;
+        }
+
+        selectedDayMeetups.innerHTML = dayMeetups
+          .map((m) => {
+            const mRecords = records.filter((r) => r.meetupId === m.id);
+            const mTotal = mRecords.reduce((acc, r) => acc + (r.total || 0), 0);
+            const isActive = m.id === activeMeetupId;
+            return `
+              <div data-select-meetup="${m.id}" class="meetup-card-item cursor-pointer rounded-xl border p-3.5 transition ${
+                isActive
+                  ? 'border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-500/30'
+                  : 'border-slate-200 hover:border-slate-300 bg-white'
+              }">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-slate-900 text-sm truncate">${escapeHtml(m.title)}</span>
+                      <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-semibold">${escapeHtml(m.time)}</span>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-1">
+                      ${m.place ? escapeHtml(m.place) + ' · ' : ''}${m.n}명 · 지각 ${mRecords.length}건 (${formatWon(mTotal)})
+                    </div>
+                  </div>
+                  <button type="button" data-del-meetup="${m.id}" class="del-meetup-btn p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="약속 삭제">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+
+        if (window.lucide) window.lucide.createIcons();
+      }
+
+      selectedDayMeetups.addEventListener('click', (e) => {
+        const delBtn = e.target.closest('.del-meetup-btn');
+        if (delBtn) {
+          e.stopPropagation();
+          const id = delBtn.getAttribute('data-del-meetup');
+          if (activeMeetupId === id) {
+            const sameDay = meetups.filter((m) => m.date === selectedDate && m.id !== id);
+            activeMeetupId = sameDay.length > 0 ? sameDay[0].id : null;
+          }
+          persistDeleteMeetup(id);
+          showToast('약속을 삭제했습니다.');
+          return;
+        }
+        const card = e.target.closest('.meetup-card-item');
+        if (card) {
+          activeMeetupId = card.getAttribute('data-select-meetup');
+          renderCalendar();
+          renderSelectedDay();
+          renderSettlePanel();
+        }
+      });
+
+      function openMeetupModal(defaultDate) {
+        modalMeetupTitle.value = '';
+        modalMeetupDate.value = defaultDate || selectedDate;
+        modalMeetupTime.value = '18:00';
+        modalMeetupPlace.value = '';
+        modalMeetupN.value = '4';
+        modalMeetupAttendees.value = '';
+        meetupModal.classList.remove('hidden');
+        modalMeetupTitle.focus();
+      }
+
+      function closeMeetupModal() {
+        meetupModal.classList.add('hidden');
+      }
+
+      btnOpenNewMeetup.addEventListener('click', () => openMeetupModal(selectedDate));
+      btnAddOnSelected.addEventListener('click', () => openMeetupModal(selectedDate));
+      btnCloseMeetupModal.addEventListener('click', closeMeetupModal);
+      btnCancelMeetupModal.addEventListener('click', closeMeetupModal);
+
+      modalMeetupAttendees.addEventListener('input', () => {
+        const list = modalMeetupAttendees.value
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (list.length > 0) {
+          modalMeetupN.value = String(list.length);
+        }
+      });
+
+      btnSaveMeetupModal.addEventListener('click', () => {
+        const title = modalMeetupTitle.value.trim() || '모임 약속';
+        const date = modalMeetupDate.value || selectedDate;
+        const time = modalMeetupTime.value || '18:00';
+        const place = modalMeetupPlace.value.trim();
+        const attendees = modalMeetupAttendees.value
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const n = Math.max(1, parseInt(modalMeetupN.value, 10) || attendees.length || 4);
+
+        const newMeetup = {
+          id: 'm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+          title,
+          date,
+          time,
+          place,
+          n,
+          attendees,
+        };
+
+        selectedDate = date;
+        const [y, mo] = date.split('-').map(Number);
+        currentYear = y;
+        currentMonth = mo - 1;
+        activeMeetupId = newMeetup.id;
+
+        persistAddMeetup(newMeetup);
+        closeMeetupModal();
+        showToast(`'${title}' 약속을 만들었습니다.`);
+      });
+
+      function getSettlePreviewValues() {
+        const m = meetups.find((x) => x.id === activeMeetupId);
+        if (!m) return { n: 1, k: 1, t: 0, mult: 1, total: 0, exempt: false };
+        const n = m.n || 1;
+        const k = Math.max(1, parseInt(settleK.value, 10) || 1);
+        const t = Math.max(0, parseInt(settleT.value, 10) || 0);
+        const exempt = settleExempt.checked;
+        const mult = Math.pow(2, k - 1);
+        const total = exempt ? 0 : n * (mult * BASE_X + 100 * t);
+        return { n, k, t, mult, total, exempt };
+      }
+
+      function updateSettlePreview() {
+        const { mult, total, exempt } = getSettlePreviewValues();
+        settleMultBadge.textContent = `${mult.toLocaleString('ko-KR')}배`;
+        settlePreviewAmount.textContent = exempt ? '0원 (면제)' : formatWon(total);
+      }
+
+      function syncSettleKForName(nameStr) {
+        const m = meetups.find((x) => x.id === activeMeetupId);
+        if (!m) return;
+        const yearStr = (m.date || todayStr).slice(0, 4);
+        const pastCount = getAnnualLateCount(nameStr, yearStr);
+        settleK.value = String(pastCount + 1);
+        updateSettlePreview();
+      }
+
+      function renderSettlePanel() {
+        const m = meetups.find((x) => x.id === activeMeetupId);
+        if (!m) {
+          meetupSettlePanel.classList.add('hidden');
+          return;
+        }
+        meetupSettlePanel.classList.remove('hidden');
+        settleMeetupTitle.textContent = m.title;
+        settleMeetupMeta.textContent = `${formatKoreanDate(m.date)} · ${m.time}${m.place ? ' · ' + m.place : ''} · ${m.n}명`;
+
+        const [hh, mm] = (m.time || '18:00').split(':').map(Number);
+        const totalMin = (hh || 0) * 60 + (mm || 0) + 5;
+        const arrH = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
+        const arrM = String(totalMin % 60).padStart(2, '0');
+        settleArrivedTime.value = `${arrH}:${arrM}:00`;
+        settleT.value = '5';
+        settleExempt.checked = false;
+
+        if (m.attendees && m.attendees.length > 0) {
+          settleAttendeeChipsWrap.classList.remove('hidden');
+          const yearStr = m.date.slice(0, 4);
+          settleAttendeeChips.innerHTML = m.attendees
+            .map((name) => {
+              const cnt = getAnnualLateCount(name, yearStr);
+              return `<button type="button" data-chip-name="${escapeHtml(name)}" class="attendee-chip-btn px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-xs font-semibold text-slate-700 transition">${escapeHtml(name)} <span class="text-[10px] text-slate-400">(${cnt}회)</span></button>`;
+            })
+            .join('');
+        } else {
+          settleAttendeeChipsWrap.classList.add('hidden');
+        }
+
+        updateSettlePreview();
+
+        const mRecords = records.filter((r) => r.meetupId === m.id);
+        const mSum = mRecords.reduce((acc, r) => acc + (r.total || 0), 0);
+        settleMeetupTotal.textContent = `합계 ${formatWon(mSum)}`;
+
+        if (mRecords.length === 0) {
+          settleRecordsList.innerHTML = `<div class="text-xs text-slate-400 py-2 text-center">아직 이 약속에 저장된 지각자가 없습니다.</div>`;
+        } else {
+          settleRecordsList.innerHTML = mRecords
+            .map(
+              (r) => `
+              <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <span class="text-xs font-bold text-slate-900">${escapeHtml(r.name)}</span>
+                  <span class="text-[11px] text-slate-500 ml-1.5">${
+                    r.exempt ? '면제/감면' : `${r.k}회차(${r.mult}배) · ${r.t}분`
+                  }</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span class="text-xs font-extrabold ${r.exempt ? 'text-emerald-600' : 'text-indigo-600'}">${formatWon(r.total)}</span>
+                  <button type="button" data-del-settle-rec="${r.id}" class="del-settle-rec-btn p-1 rounded text-slate-400 hover:text-rose-600 transition" title="삭제">
+                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+              </div>
+            `
+            )
+            .join('');
+        }
+
+        if (window.lucide) window.lucide.createIcons();
+      }
+
+      settleAttendeeChips.addEventListener('click', (e) => {
+        const chip = e.target.closest('.attendee-chip-btn');
+        if (!chip) return;
+        const name = chip.getAttribute('data-chip-name');
+        settleName.value = name;
+        syncSettleKForName(name);
+      });
+
+      settleName.addEventListener('input', () => {
+        syncSettleKForName(settleName.value);
+      });
+
+      settleArrivedTime.addEventListener('input', () => {
+        const m = meetups.find((x) => x.id === activeMeetupId);
+        if (!m) return;
+        const sParts = (m.time || '00:00').split(':').map(Number);
+        const aParts = (settleArrivedTime.value || '00:00:00').split(':').map(Number);
+        const sSec = (sParts[0] || 0) * 3600 + (sParts[1] || 0) * 60;
+        const aSec = (aParts[0] || 0) * 3600 + (aParts[1] || 0) * 60 + (aParts[2] || 0);
+        const diff = aSec - sSec;
+        settleT.value = diff <= 0 ? '0' : String(Math.ceil(diff / 60));
+        updateSettlePreview();
+      });
+
+      settleK.addEventListener('input', updateSettlePreview);
+      settleT.addEventListener('input', updateSettlePreview);
+      settleExempt.addEventListener('change', updateSettlePreview);
+
+      btnSettleSave.addEventListener('click', () => {
+        const m = meetups.find((x) => x.id === activeMeetupId);
+        if (!m) return;
+        const name = settleName.value.trim() || '익명';
+        const { n, k, t, mult, total, exempt } = getSettlePreviewValues();
+        const item = {
+          id: 'r_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          meetupId: m.id,
+          meetupTitle: m.title,
+          name,
+          date: m.date,
+          n,
+          k,
+          t,
+          x: BASE_X,
+          mult,
+          total,
+          exempt,
+        };
+        settleName.value = '';
+        persistAddRecord(item);
+        showToast(`${name}님 지각비 ${formatWon(total)} 저장 완료!`);
+      });
+
+      settleRecordsList.addEventListener('click', (e) => {
+        const btn = e.target.closest('.del-settle-rec-btn');
+        if (!btn) return;
+        const id = btn.getAttribute('data-del-settle-rec');
+        persistDeleteRecord(id);
+        showToast('정산 내역을 삭제했습니다.');
+      });
+
+      btnCopyMeetupSummary.addEventListener('click', () => {
+        const m = meetups.find((x) => x.id === activeMeetupId);
+        if (!m) return;
+        const mRecords = records.filter((r) => r.meetupId === m.id);
+        const mSum = mRecords.reduce((acc, r) => acc + (r.total || 0), 0);
+        const lines = [
+          `[대앰생회의 약속 정산] ${m.title}`,
+          `• 일시: ${m.date} ${m.time}${m.place ? ' / ' + m.place : ''} (${m.n}명)`,
+        ];
+        if (mRecords.length === 0) {
+          lines.push('• 지각자 없음 (전원 정시 도착!)');
+        } else {
+          mRecords.forEach((r) => {
+            lines.push(
+              r.exempt
+                ? `• ${r.name}: 0원 (면제/감면)`
+                : `• ${r.name}: ${formatWon(r.total)} (${r.k}회차·${r.mult}배 / ${r.t}분 지각)`
+            );
+          });
+          lines.push(`• 총 지각비: ${formatWon(mSum)} (7일 내 공금계좌 입금)`);
+        }
+        copyText(lines.join('\n'), '약속 정산 내역을 복사했습니다.');
+      });
+
+      // ================== STANDALONE CALCULATOR ==================
+      function getValues() {
+        const n = Math.max(1, parseInt(inputN.value, 10) || 1);
+        const k = Math.max(1, parseInt(inputK.value, 10) || 1);
+        const t = Math.max(0, parseInt(inputT.value, 10) || 0);
+        const x = Math.max(0, parseInt(inputX.value, 10) || 0);
+        const mult = Math.pow(2, k - 1);
+        const total = n * (mult * x + 100 * t);
+        return { n, k, t, x, mult, total };
+      }
+
+      function updateCalculator() {
+        const { n, k, t, x, mult, total } = getValues();
+        resultTotal.textContent = formatWon(total);
+        resultMultiplier.innerHTML = `${mult.toLocaleString('ko-KR')}배 <span class="text-xs font-normal text-indigo-200">(${k}회차)</span>`;
+        resultBreakdown.textContent = `${n}명 × (${mult}배 × ${x.toLocaleString('ko-KR')}원 + 100원 × ${t}분) = ${formatWon(total)}`;
+
+        document.querySelectorAll('.k-preset-btn').forEach((btn) => {
+          const bk = parseInt(btn.getAttribute('data-k'), 10);
+          if (bk === k) {
+            btn.className = 'k-preset-btn py-2 rounded-xl border text-xs font-semibold transition border-indigo-600 bg-indigo-50 text-indigo-700';
+          } else {
+            btn.className = 'k-preset-btn py-2 rounded-xl border text-xs font-semibold transition border-slate-200 hover:bg-slate-50 text-slate-700';
+          }
+        });
+      }
+
+      inputN.addEventListener('input', () => {
+        const v = Math.max(1, parseInt(inputN.value, 10) || 1);
+        sliderN.value = Math.min(15, v);
+        updateCalculator();
+      });
+      sliderN.addEventListener('input', () => {
+        inputN.value = sliderN.value;
+        updateCalculator();
+      });
+
+      inputK.addEventListener('input', updateCalculator);
+      document.querySelectorAll('.k-preset-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          inputK.value = btn.getAttribute('data-k');
+          updateCalculator();
+        });
+      });
+
+      inputT.addEventListener('input', () => {
+        const v = Math.max(0, parseInt(inputT.value, 10) || 0);
+        sliderT.value = Math.min(60, v);
+        updateCalculator();
+      });
+      sliderT.addEventListener('input', () => {
+        inputT.value = sliderT.value;
+        updateCalculator();
+      });
+      document.querySelectorAll('.t-add-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const add = parseInt(btn.getAttribute('data-add-t'), 10);
+          const next = (parseInt(inputT.value, 10) || 0) + add;
+          inputT.value = next;
+          sliderT.value = Math.min(60, next);
+          updateCalculator();
+        });
+      });
+
+      inputX.addEventListener('input', updateCalculator);
+      btnResetX.addEventListener('click', () => {
+        inputX.value = 200;
+        updateCalculator();
+        showToast('기본 지각비 200원으로 초기화했습니다.');
+      });
+
+      function computeHelperMinutes() {
+        const sParts = (helperScheduled.value || '00:00').split(':').map(Number);
+        const aParts = (helperArrived.value || '00:00:00').split(':').map(Number);
+        const sSec = (sParts[0] || 0) * 3600 + (sParts[1] || 0) * 60;
+        const aSec = (aParts[0] || 0) * 3600 + (aParts[1] || 0) * 60 + (aParts[2] || 0);
+        const diff = aSec - sSec;
+        if (diff <= 0) {
+          helperStatus.textContent = '정시 도착 (0분 지각)';
+          return 0;
+        }
+        const mins = Math.ceil(diff / 60);
+        helperStatus.textContent = `${diff}초 초과 → 올림 ${mins}분 지각`;
+        return mins;
+      }
+
+      btnToggleTimeHelper.addEventListener('click', () => {
+        timeHelperBox.classList.toggle('hidden');
+        computeHelperMinutes();
+      });
+      helperScheduled.addEventListener('input', computeHelperMinutes);
+      helperArrived.addEventListener('input', computeHelperMinutes);
+      btnApplyTimeHelper.addEventListener('click', () => {
+        const mins = computeHelperMinutes();
+        inputT.value = mins;
+        sliderT.value = Math.min(60, mins);
+        updateCalculator();
+        showToast(`${mins}분 지각으로 적용했습니다.`);
+      });
+
+      btnCopySummary.addEventListener('click', () => {
+        const name = (inputName.value || '').trim() || '지각자';
+        const date = inputDate.value || todayStr;
+        const { n, k, t, x, mult, total } = getValues();
+        const msg = `[대앰생회의 지각비 정산]\n• 대상: ${name} (${date})\n• 조건: ${n}명 / 올해 ${k}회차(${mult}배) / ${t}분 지각 / 기본 ${x}원\n• 금액: ${formatWon(total)}\n• 기한: 지각 확정 후 7일 내 공금관리계좌 입금`;
+        copyText(msg, '단톡방 공유 문구를 복사했습니다.');
+      });
+
+      btnSaveRecord.addEventListener('click', () => {
+        const name = (inputName.value || '').trim() || '익명';
+        const date = inputDate.value || todayStr;
+        const { n, k, t, x, mult, total } = getValues();
+        const item = {
+          id: 'r_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          name,
+          date,
+          n,
+          k,
+          t,
+          x,
+          mult,
+          total,
+          exempt: false,
+        };
+        persistAddRecord(item);
+        showToast(`${name}님의 지각비 ${formatWon(total)}을 기록했습니다.`);
+      });
+
+      // ================== HISTORY ==================
+      function renderHistory() {
+        historyCountBadge.textContent = String(records.length);
+        const sum = records.reduce((acc, r) => acc + (r.total || 0), 0);
+        historyTotalAmount.textContent = formatWon(sum);
+
+        const yearPrefix = String(now.getFullYear());
+        const counts = {};
+        records.forEach((r) => {
+          if (!r.exempt && (r.date || '').startsWith(yearPrefix) && r.name) {
+            const key = r.name.trim();
+            counts[key] = (counts[key] || 0) + 1;
+          }
+        });
+        const names = Object.keys(counts);
+        if (names.length > 0) {
+          historyKSummaryCard.classList.remove('hidden');
+          historyKSummary.innerHTML = names
+            .sort((a, b) => counts[b] - counts[a])
+            .map(
+              (nm) =>
+                `<span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold">${escapeHtml(nm)}: ${counts[nm]}회 (다음 ${Math.pow(2, counts[nm])}배)</span>`
+            )
+            .join('');
+        } else {
+          historyKSummaryCard.classList.add('hidden');
+        }
+
+        if (records.length === 0) {
+          historyList.innerHTML = `
+            <div class="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+              아직 저장된 정산 기록이 없습니다. 캘린더에서 약속을 만들거나 계산기에서 저장해 보세요.
+            </div>
+          `;
+          return;
+        }
+
+        historyList.innerHTML = records
+          .map(
+            (r) => `
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-bold text-slate-900 truncate">${escapeHtml(r.name)}</span>
+                <span class="text-xs text-slate-400">${escapeHtml(r.date)}</span>
+                ${r.meetupTitle ? `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-medium">${escapeHtml(r.meetupTitle)}</span>` : ''}
+              </div>
+              <div class="text-xs text-slate-500 mt-1">
+                ${r.exempt ? '면제/감면 처리' : `${r.n}명 · ${r.k}회차(${r.mult}배) · ${r.t}분 지각`}
+              </div>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+              <span class="font-extrabold ${r.exempt ? 'text-emerald-600' : 'text-indigo-600'} text-base">${formatWon(r.total)}</span>
+              <button type="button" data-del-id="${r.id}" class="del-record-btn p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="삭제">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        `
+          )
+          .join('');
+
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      }
+
+      historyList.addEventListener('click', (e) => {
+        const btn = e.target.closest('.del-record-btn');
+        if (!btn) return;
+        const id = btn.getAttribute('data-del-id');
+        persistDeleteRecord(id);
+        showToast('기록을 삭제했습니다.');
+      });
+
+      btnExportHistory.addEventListener('click', () => {
+        if (records.length === 0) {
+          showToast('복사할 기록이 없습니다.');
+          return;
+        }
+        const sum = records.reduce((acc, r) => acc + (r.total || 0), 0);
+        const lines = records.map(
+          (r, idx) =>
+            `${idx + 1}. ${r.date} ${r.name}${r.meetupTitle ? ' [' + r.meetupTitle + ']' : ''} (${
+              r.exempt ? '면제' : `${r.n}명/${r.k}회차/${r.t}분`
+            }) → ${formatWon(r.total)}`
+        );
+        lines.push(`\n총 공금 합계: ${formatWon(sum)}`);
+        copyText(lines.join('\n'), '전체 정산 내역을 복사했습니다.');
+      });
+
+      btnClearHistory.addEventListener('click', () => {
+        if (records.length === 0) return;
+        persistClearRecords();
+        showToast('모든 기록을 삭제했습니다.');
+      });
+
+      // Init all views & try Supabase connection if configured
+      renderAll();
+      updateCalculator();
+      initSupabase();
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    })();
+  </script>
+</body>
+</html>

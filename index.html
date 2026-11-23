@@ -21,6 +21,84 @@
       color: #ffffff;
       box-shadow: 0 1px 3px rgba(79, 70, 229, 0.35);
     }
+    /* Dark Mode Theme Overrides */
+    html.dark body {
+      background-color: #0f172a;
+      color: #f1f5f9;
+    }
+    html.dark header,
+    html.dark .bg-white {
+      background-color: #1e293b !important;
+    }
+    html.dark .bg-slate-50,
+    html.dark .bg-slate-50\/60,
+    html.dark .bg-slate-50\/40,
+    html.dark .bg-slate-50\/70 {
+      background-color: #0f172a !important;
+    }
+    html.dark .bg-slate-100 {
+      background-color: #334155 !important;
+    }
+    html.dark .bg-slate-200 {
+      background-color: #475569 !important;
+    }
+    html.dark .bg-indigo-50,
+    html.dark .bg-indigo-50\/50,
+    html.dark .bg-indigo-50\/70 {
+      background-color: rgba(79, 70, 229, 0.16) !important;
+    }
+    html.dark .bg-rose-50,
+    html.dark .bg-rose-50\/60,
+    html.dark .bg-rose-50\/80 {
+      background-color: rgba(244, 63, 94, 0.14) !important;
+    }
+    html.dark .bg-emerald-50,
+    html.dark .bg-emerald-50\/40 {
+      background-color: rgba(16, 185, 129, 0.14) !important;
+    }
+    html.dark .bg-amber-50,
+    html.dark .bg-amber-50\/40 {
+      background-color: rgba(245, 158, 11, 0.14) !important;
+    }
+    html.dark .text-slate-900 { color: #f8fafc !important; }
+    html.dark .text-slate-800 { color: #e2e8f0 !important; }
+    html.dark .text-slate-700 { color: #cbd5e1 !important; }
+    html.dark .text-slate-600 { color: #94a3b8 !important; }
+    html.dark .text-slate-500 { color: #94a3b8 !important; }
+    html.dark .text-slate-400 { color: #64748b !important; }
+    html.dark .text-indigo-900 { color: #c7d2fe !important; }
+    html.dark .text-indigo-700 { color: #a5b4fc !important; }
+    html.dark .text-indigo-600 { color: #818cf8 !important; }
+    html.dark .text-rose-700 { color: #fda4af !important; }
+    html.dark .text-amber-900,
+    html.dark .text-amber-800 { color: #fcd34d !important; }
+    html.dark .border-slate-200,
+    html.dark .border-slate-100,
+    html.dark .border-slate-300 {
+      border-color: #334155 !important;
+    }
+    html.dark .border-indigo-200,
+    html.dark .border-indigo-100 {
+      border-color: rgba(99, 102, 241, 0.35) !important;
+    }
+    html.dark .border-rose-300,
+    html.dark .border-rose-200,
+    html.dark .border-rose-200\/80 {
+      border-color: rgba(244, 63, 94, 0.4) !important;
+    }
+    html.dark .border-emerald-200 {
+      border-color: rgba(16, 185, 129, 0.35) !important;
+    }
+    html.dark input,
+    html.dark select {
+      background-color: #0f172a !important;
+      color: #f8fafc !important;
+      border-color: #334155 !important;
+    }
+    html.dark .hover\:bg-slate-50:hover,
+    html.dark .hover\:bg-slate-100:hover {
+      background-color: #334155 !important;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen antialiased">
@@ -577,7 +655,13 @@
           <h2 class="text-base font-bold text-slate-900">활동 로그</h2>
           <p class="text-xs text-slate-500 mt-0.5">약속 생성·참여·출석·투표·삭제 등 모든 변경 이력이 기록됩니다.</p>
         </div>
-        <span id="logs-count-badge" class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">0건</span>
+        <div class="flex items-center gap-2">
+          <span id="logs-count-badge" class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">0건</span>
+          <button id="btn-copy-logs" type="button" class="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition flex items-center gap-1.5">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>로그 복사</span>
+          </button>
+        </div>
       </div>
       <div id="logs-list" class="space-y-2"></div>
     </section>
@@ -746,6 +830,12 @@
     </div>
   </div>
 
+  <!-- Floating Bottom-Left Theme Toggle (Moon / Sun) -->
+  <button id="btn-toggle-theme" type="button" aria-label="다크 모드 전환" title="다크 / 라이트 모드 전환" class="fixed bottom-5 left-5 z-40 w-11 h-11 rounded-full bg-white border border-slate-200 shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center text-slate-700">
+    <i id="theme-icon-moon" data-lucide="moon" class="w-5 h-5"></i>
+    <i id="theme-icon-sun" data-lucide="sun" class="w-5 h-5 hidden text-amber-400"></i>
+  </button>
+
   <!-- Toast Notification -->
   <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-medium shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50">
     복사되었습니다.
@@ -770,6 +860,7 @@
       const STORAGE_KEY_PROFILE = 'daemsaeng_profile_v1';
       const STORAGE_KEY_CHAT = 'daemsaeng_chat_v1';
       const STORAGE_KEY_LOGS = 'daemsaeng_logs_v1';
+      const STORAGE_KEY_THEME = 'daemsaeng_theme_v1';
       const BASE_X = 200;
 
       const SETUP_SQL = `create table if not exists meetups (
@@ -990,6 +1081,10 @@ alter publication supabase_realtime add table activity_logs;`;
       const historyFilterBar = document.getElementById('history-filter-bar');
       const logsCountBadge = document.getElementById('logs-count-badge');
       const logsList = document.getElementById('logs-list');
+      const btnCopyLogs = document.getElementById('btn-copy-logs');
+      const btnToggleTheme = document.getElementById('btn-toggle-theme');
+      const themeIconMoon = document.getElementById('theme-icon-moon');
+      const themeIconSun = document.getElementById('theme-icon-sun');
       const btnExportHistory = document.getElementById('btn-export-history');
       const btnClearHistory = document.getElementById('btn-clear-history');
       const toastEl = document.getElementById('toast');
@@ -2292,9 +2387,11 @@ alter publication supabase_realtime add table activity_logs;`;
                     <span class="text-xs font-extrabold ${
                       ctx.status === 'none' ? 'text-rose-600' : r.exempt || ctx.status === 'passed' ? 'text-emerald-600' : 'text-indigo-600'
                     }">${formatWon(r.total)}</span>
-                    <button type="button" data-del-settle-rec="${r.id}" class="del-settle-rec-btn p-1 rounded text-slate-400 hover:text-rose-600 transition" title="삭제">
-                      <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                    </button>
+                    ${
+                      ctx.status === 'open' || ctx.status === 'passed'
+                        ? `<span class="p-1 text-slate-400" title="투표 중이거나 완료된 기록은 삭제할 수 없습니다"><i data-lucide="lock" class="w-3.5 h-3.5"></i></span>`
+                        : `<button type="button" data-del-settle-rec="${r.id}" class="del-settle-rec-btn p-1 rounded text-slate-400 hover:text-rose-600 transition" title="삭제"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>`
+                    }
                   </div>
                 </div>
                 ${renderVoteBlockHtml(r)}
@@ -2644,6 +2741,13 @@ alter publication supabase_realtime add table activity_logs;`;
         if (!btn) return;
         const id = btn.getAttribute('data-del-settle-rec');
         const delR = records.find((x) => x.id === id);
+        if (delR) {
+          const vCtx = getVoteContext(delR);
+          if (vCtx.status === 'open' || vCtx.status === 'passed') {
+            showToast('투표 중이거나 납부 완료된 내역은 삭제할 수 없습니다.');
+            return;
+          }
+        }
         persistDeleteRecord(id);
         logActivity('기록 삭제', `${delR ? delR.name + ' (' + formatWon(delR.total) + ')' : id} 삭제`);
         showToast('정산 내역을 삭제했습니다.');
@@ -2654,9 +2758,19 @@ alter publication supabase_realtime add table activity_logs;`;
         if (!m) return;
         const mRecords = records.filter((r) => r.meetupId === m.id);
         const mSum = mRecords.reduce((acc, r) => acc + (r.total || 0), 0);
+        const attList = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
+        const attText = attList.length > 0
+          ? attList
+              .map((a) => {
+                const st = a.status === 'ontime' ? '✓정시' : a.status === 'late' ? `${a.lateMinutes}분 지각` : '대기';
+                return `${a.name}(${st})`;
+              })
+              .join(', ')
+          : '없음';
         const lines = [
           `[앰생전산 약속 정산] ${m.title}`,
           `• 일시: ${m.date} ${m.time}${m.place ? ' / ' + m.place : ''} (${m.n}명)`,
+          `• 참석 예정자: ${attText}`,
         ];
         if (mRecords.length === 0) {
           lines.push('• 지각자 없음 (전원 정시 도착!)');
@@ -2855,9 +2969,11 @@ alter publication supabase_realtime add table activity_logs;`;
                 <span class="font-extrabold ${
                   ctx.status === 'none' && ctx.meetup ? 'text-rose-600' : r.exempt || ctx.status === 'passed' ? 'text-emerald-600' : 'text-indigo-600'
                 } text-base">${formatWon(r.total)}</span>
-                <button type="button" data-del-id="${r.id}" class="del-record-btn p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="삭제">
-                  <i data-lucide="trash-2" class="w-4 h-4"></i>
-                </button>
+                ${
+                  ctx.status === 'open' || ctx.status === 'passed'
+                    ? `<span class="p-1.5 text-slate-400" title="투표 중이거나 완료된 기록은 삭제할 수 없습니다"><i data-lucide="lock" class="w-4 h-4"></i></span>`
+                    : `<button type="button" data-del-id="${r.id}" class="del-record-btn p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="삭제"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`
+                }
               </div>
             </div>
             ${renderVoteBlockHtml(r)}
@@ -2886,6 +3002,13 @@ alter publication supabase_realtime add table activity_logs;`;
         if (!btn) return;
         const id = btn.getAttribute('data-del-id');
         const delR = records.find((x) => x.id === id);
+        if (delR) {
+          const vCtx = getVoteContext(delR);
+          if (vCtx.status === 'open' || vCtx.status === 'passed') {
+            showToast('투표 중이거나 납부 완료된 내역은 삭제할 수 없습니다.');
+            return;
+          }
+        }
         persistDeleteRecord(id);
         logActivity('기록 삭제', `${delR ? delR.name + ' (' + formatWon(delR.total) + ')' : id} 삭제`);
         showToast('기록을 삭제했습니다.');
@@ -2921,11 +3044,31 @@ alter publication supabase_realtime add table activity_logs;`;
         renderHistory();
       });
 
-      btnClearHistory.addEventListener('click', () => {
+      btnClearHistory.addEventListener('click', async () => {
         if (records.length === 0) return;
-        persistClearRecords();
-        logActivity('전체 삭제', '정산 기록 전체 삭제');
-        showToast('모든 기록을 삭제했습니다.');
+        const protectedRecs = records.filter((r) => {
+          const st = getVoteContext(r).status;
+          return st === 'open' || st === 'passed';
+        });
+        const deletableRecs = records.filter((r) => {
+          const st = getVoteContext(r).status;
+          return st !== 'open' && st !== 'passed';
+        });
+        if (deletableRecs.length === 0) {
+          showToast('투표 중이거나 납부 완료된 기록만 있어 삭제할 수 없습니다.');
+          return;
+        }
+        if (protectedRecs.length === 0) {
+          await persistClearRecords();
+          logActivity('전체 삭제', '정산 기록 전체 삭제');
+          showToast('모든 기록을 삭제했습니다.');
+        } else {
+          for (const r of deletableRecs) {
+            await persistDeleteRecord(r.id);
+          }
+          logActivity('선택 삭제', `미투표/면제 기록 ${deletableRecs.length}건 삭제 (투표·완료 ${protectedRecs.length}건 보존)`);
+          showToast(`미투표/면제 ${deletableRecs.length}건 삭제 (투표·완료 ${protectedRecs.length}건은 보존됨)`);
+        }
       });
 
       // ================== REALTIME CHAT ==================
@@ -3015,6 +3158,57 @@ alter publication supabase_realtime add table activity_logs;`;
       btnSendChat.addEventListener('click', sendChatMessage);
       chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.isComposing) sendChatMessage();
+      });
+
+      // Copy Activity Logs
+      btnCopyLogs.addEventListener('click', () => {
+        if (activityLogs.length === 0) {
+          showToast('복사할 활동 로그가 없습니다.');
+          return;
+        }
+        const lines = activityLogs.map((l) => {
+          const actor = l.actorId ? `${l.actorName}(@${l.actorId})` : l.actorName;
+          const ts = l.createdAt
+            ? new Date(l.createdAt).toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+              })
+            : '';
+          return `[${ts}] [${l.action}] ${actor}: ${l.detail}`;
+        });
+        copyText(lines.join('\n'), '활동 로그를 복사했습니다.');
+      });
+
+      // Dark Mode Theme Toggle
+      function applyTheme(isDark) {
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+          themeIconMoon.classList.add('hidden');
+          themeIconSun.classList.remove('hidden');
+        } else {
+          document.documentElement.classList.remove('dark');
+          themeIconMoon.classList.remove('hidden');
+          themeIconSun.classList.add('hidden');
+        }
+      }
+
+      let isDarkTheme = false;
+      try {
+        isDarkTheme = localStorage.getItem(STORAGE_KEY_THEME) === 'dark';
+      } catch (e) {}
+      applyTheme(isDarkTheme);
+
+      btnToggleTheme.addEventListener('click', () => {
+        isDarkTheme = !isDarkTheme;
+        applyTheme(isDarkTheme);
+        try {
+          localStorage.setItem(STORAGE_KEY_THEME, isDarkTheme ? 'dark' : 'light');
+        } catch (e) {}
       });
 
       // Init all views & try Supabase connection if configured

@@ -89,6 +89,10 @@
           <i data-lucide="scroll-text" class="w-4 h-4"></i>
           <span>규정안내</span>
         </button>
+        <button id="tab-btn-logs" type="button" class="text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap">
+          <i data-lucide="history" class="w-4 h-4"></i>
+          <span>로그</span>
+        </button>
       </nav>
     </div>
   </header>
@@ -194,10 +198,7 @@
                   <span>출석 QR 띄우기</span>
                 </button>
               </div>
-              <div class="flex gap-1.5 pt-1">
-                <input id="join-meetup-name" type="text" placeholder="다른 친구 이름 직접 추가 (선택)" class="flex-1 px-2.5 py-1 rounded-lg border border-indigo-200/80 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                <button id="btn-join-meetup" type="button" class="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition shrink-0">추가</button>
-              </div>
+
             </div>
 
             <!-- Attendee Quick Chips & Attendance Status -->
@@ -442,12 +443,7 @@
           </div>
         </div>
 
-        <div class="pt-2 flex flex-col sm:flex-row gap-2.5">
-          <button id="btn-save-record" type="button" class="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold transition flex items-center justify-center gap-2">
-            <i data-lucide="plus-circle" class="w-4 h-4"></i>
-            <span>정산 기록에 저장하기</span>
-          </button>
-        </div>
+
       </div>
     </section>
 
@@ -562,7 +558,28 @@
         <div id="history-k-summary" class="flex flex-wrap gap-2"></div>
       </div>
 
+      <!-- History Status Filter -->
+      <div class="flex flex-wrap items-center gap-1.5" id="history-filter-bar">
+        <button type="button" data-hist-filter="all" class="hist-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold transition bg-indigo-600 text-white shadow-xs">전체</button>
+        <button type="button" data-hist-filter="none" class="hist-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold transition bg-white border border-slate-200 text-slate-600 hover:bg-slate-50">미투표(미납)</button>
+        <button type="button" data-hist-filter="open" class="hist-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold transition bg-white border border-slate-200 text-slate-600 hover:bg-slate-50">투표 중</button>
+        <button type="button" data-hist-filter="passed" class="hist-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold transition bg-white border border-slate-200 text-slate-600 hover:bg-slate-50">납부 완료</button>
+        <button type="button" data-hist-filter="exempt" class="hist-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold transition bg-white border border-slate-200 text-slate-600 hover:bg-slate-50">면제</button>
+      </div>
+
       <div id="history-list" class="space-y-2.5"></div>
+    </section>
+
+    <!-- SECTION 4: ACTIVITY LOGS -->
+    <section id="view-logs" class="hidden space-y-4 max-w-3xl mx-auto">
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">활동 로그</h2>
+          <p class="text-xs text-slate-500 mt-0.5">약속 생성·참여·출석·투표·삭제 등 모든 변경 이력이 기록됩니다.</p>
+        </div>
+        <span id="logs-count-badge" class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">0건</span>
+      </div>
+      <div id="logs-list" class="space-y-2"></div>
     </section>
   </main>
 
@@ -752,6 +769,7 @@
       const STORAGE_KEY_SYNC = 'daemsaeng_sync_config_v1';
       const STORAGE_KEY_PROFILE = 'daemsaeng_profile_v1';
       const STORAGE_KEY_CHAT = 'daemsaeng_chat_v1';
+      const STORAGE_KEY_LOGS = 'daemsaeng_logs_v1';
       const BASE_X = 200;
 
       const SETUP_SQL = `create table if not exists meetups (
@@ -810,9 +828,24 @@ grant all on table public.meetups to anon, authenticated;
 grant all on table public.late_records to anon, authenticated;
 grant all on table public.chat_messages to anon, authenticated;
 
+create table if not exists activity_logs (
+  id text primary key,
+  room_id text not null,
+  actor_id text default '',
+  actor_name text not null,
+  action text not null,
+  detail text not null,
+  created_at timestamptz default now()
+);
+
+alter table activity_logs enable row level security;
+create policy "Allow all for activity_logs" on activity_logs for all using (true) with check (true);
+grant all on table public.activity_logs to anon, authenticated;
+
 alter publication supabase_realtime add table meetups;
 alter publication supabase_realtime add table late_records;
-alter publication supabase_realtime add table chat_messages;`;
+alter publication supabase_realtime add table chat_messages;
+alter publication supabase_realtime add table activity_logs;`;
 
       // Navigation elements
       const tabBtns = {
@@ -821,6 +854,7 @@ alter publication supabase_realtime add table chat_messages;`;
         calc: document.getElementById('tab-btn-calc'),
         history: document.getElementById('tab-btn-history'),
         rules: document.getElementById('tab-btn-rules'),
+        logs: document.getElementById('tab-btn-logs'),
       };
       const views = {
         planner: document.getElementById('view-planner'),
@@ -828,6 +862,7 @@ alter publication supabase_realtime add table chat_messages;`;
         calc: document.getElementById('view-calc'),
         history: document.getElementById('view-history'),
         rules: document.getElementById('view-rules'),
+        logs: document.getElementById('view-logs'),
       };
 
       // PIN Gate
@@ -887,8 +922,7 @@ alter publication supabase_realtime add table chat_messages;`;
 
       const btnJoinAsMe = document.getElementById('btn-join-as-me');
       const btnJoinAsMeLabel = document.getElementById('btn-join-as-me-label');
-      const joinMeetupName = document.getElementById('join-meetup-name');
-      const btnJoinMeetup = document.getElementById('btn-join-meetup');
+
       const settleAttendeeChipsWrap = document.getElementById('settle-attendee-chips-wrap');
       const settleAttendeeChips = document.getElementById('settle-attendee-chips');
       const btnCheckinMe = document.getElementById('btn-checkin-me');
@@ -939,7 +973,7 @@ alter publication supabase_realtime add table chat_messages;`;
       const resultMultiplier = document.getElementById('result-multiplier');
       const resultBreakdown = document.getElementById('result-breakdown');
       const btnCopySummary = document.getElementById('btn-copy-summary');
-      const btnSaveRecord = document.getElementById('btn-save-record');
+
       const btnToggleTimeHelper = document.getElementById('btn-toggle-time-helper');
       const timeHelperBox = document.getElementById('time-helper-box');
       const helperScheduled = document.getElementById('helper-scheduled');
@@ -953,6 +987,9 @@ alter publication supabase_realtime add table chat_messages;`;
       const historyKSummaryCard = document.getElementById('history-k-summary-card');
       const historyKSummary = document.getElementById('history-k-summary');
       const historyList = document.getElementById('history-list');
+      const historyFilterBar = document.getElementById('history-filter-bar');
+      const logsCountBadge = document.getElementById('logs-count-badge');
+      const logsList = document.getElementById('logs-list');
       const btnExportHistory = document.getElementById('btn-export-history');
       const btnClearHistory = document.getElementById('btn-clear-history');
       const toastEl = document.getElementById('toast');
@@ -969,6 +1006,8 @@ alter publication supabase_realtime add table chat_messages;`;
       let records = loadJson(STORAGE_KEY_RECORDS, []);
       let meetups = loadJson(STORAGE_KEY_MEETUPS, []);
       let chatMessages = loadJson(STORAGE_KEY_CHAT, []);
+      let activityLogs = loadJson(STORAGE_KEY_LOGS, []);
+      let historyFilter = 'all';
       let userProfile = loadJson(STORAGE_KEY_PROFILE, null);
       let syncConfig = loadSyncConfig();
       let sbClient = null;
@@ -1135,6 +1174,11 @@ alter publication supabase_realtime add table chat_messages;`;
                 fetchRemoteData();
               }
             )
+            .on(
+              'postgres_changes',
+              { event: 'INSERT', schema: 'public', table: 'activity_logs', filter: `room_id=eq.${syncConfig.roomId}` },
+              () => { fetchRemoteData(); }
+            )
             .subscribe();
 
           setSyncBadge(true);
@@ -1209,6 +1253,25 @@ alter publication supabase_realtime add table chat_messages;`;
                 senderName: c.sender_name,
                 message: c.message,
                 createdAt: c.created_at,
+              }));
+            }
+          } catch (e) {}
+
+          try {
+            const lRes = await sbClient
+              .from('activity_logs')
+              .select('*')
+              .eq('room_id', syncConfig.roomId)
+              .order('created_at', { ascending: false })
+              .limit(150);
+            if (!lRes.error && Array.isArray(lRes.data)) {
+              activityLogs = lRes.data.map((l) => ({
+                id: l.id,
+                actorId: l.actor_id || '',
+                actorName: l.actor_name,
+                action: l.action,
+                detail: l.detail,
+                createdAt: l.created_at,
               }));
             }
           } catch (e) {}
@@ -1525,6 +1588,7 @@ alter publication supabase_realtime add table chat_messages;`;
           return;
         }
         persistUpdateRecord(r.id, { voteStatus: 'open', votes: r.votes || [] });
+        logActivity('투표 시작', `${r.name}님 지각비(${formatWon(r.total)}) 납부 확인 투표 시작`);
         showToast('납부 확인 투표를 시작했습니다!');
       }
 
@@ -1552,6 +1616,7 @@ alter publication supabase_realtime add table chat_messages;`;
         const validCount = nextVotes.filter((v) => eligibleKeys.has(v.key)).length;
         const nextStatus = validCount >= ctx.totalEligible && ctx.totalEligible > 0 ? 'passed' : 'open';
         persistUpdateRecord(r.id, { voteStatus: nextStatus, votes: nextVotes });
+        logActivity(nextStatus === 'passed' ? '납부 확정' : ctx.hasMyVote ? '동의 취소' : '납부 동의', `${r.name}님 지각비(${formatWon(r.total)})`);
         showToast(nextStatus === 'passed' ? '전원 동의로 납부가 확정되었습니다!' : ctx.hasMyVote ? '동의를 취소했습니다.' : '납부 확인에 동의했습니다.');
       }
 
@@ -1580,6 +1645,78 @@ alter publication supabase_realtime add table chat_messages;`;
         }
       }
 
+      async function logActivity(action, detail) {
+        const actorId = userProfile && userProfile.id ? userProfile.id : '';
+        const actorName = userProfile && userProfile.name ? userProfile.name : '비회원';
+        const entry = {
+          id: 'log_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          actorId,
+          actorName,
+          action,
+          detail,
+          createdAt: new Date().toISOString(),
+        };
+        activityLogs = [entry, ...activityLogs].slice(0, 200);
+        try {
+          localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(activityLogs));
+        } catch (e) {}
+        renderLogs();
+
+        if (sbClient) {
+          try {
+            await sbClient.from('activity_logs').insert({
+              id: entry.id,
+              room_id: syncConfig.roomId,
+              actor_id: entry.actorId,
+              actor_name: entry.actorName,
+              action: entry.action,
+              detail: entry.detail,
+              created_at: entry.createdAt,
+            });
+          } catch (e) {}
+        }
+      }
+
+      function renderLogs() {
+        if (!logsCountBadge || !logsList) return;
+        logsCountBadge.textContent = `${activityLogs.length}건`;
+        if (activityLogs.length === 0) {
+          logsList.innerHTML = `
+            <div class="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+              아직 기록된 활동 로그가 없습니다.
+            </div>
+          `;
+          return;
+        }
+        logsList.innerHTML = activityLogs
+          .map((l) => {
+            const actorLabel = l.actorId ? `${l.actorName} (@${l.actorId})` : l.actorName;
+            const timeStr = l.createdAt
+              ? new Date(l.createdAt).toLocaleString('ko-KR', {
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false,
+                })
+              : '';
+            return `
+              <div class="bg-white rounded-xl border border-slate-200 px-4 py-3 shadow-xs flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-bold">${escapeHtml(l.action)}</span>
+                    <span class="text-xs font-semibold text-slate-800">${escapeHtml(actorLabel)}</span>
+                  </div>
+                  <p class="text-xs text-slate-600 mt-1 break-words">${escapeHtml(l.detail)}</p>
+                </div>
+                <span class="text-[11px] text-slate-400 shrink-0 whitespace-nowrap">${escapeHtml(timeStr)}</span>
+              </div>
+            `;
+          })
+          .join('');
+      }
+
       function renderAll() {
         renderProfileUI();
         renderCalendar();
@@ -1587,6 +1724,7 @@ alter publication supabase_realtime add table chat_messages;`;
         renderSettlePanel();
         renderHistory();
         renderChat();
+        renderLogs();
       }
 
       function formatWon(num) {
@@ -1733,6 +1871,7 @@ alter publication supabase_realtime add table chat_messages;`;
       tabBtns.calc.addEventListener('click', () => switchTab('calc'));
       tabBtns.history.addEventListener('click', () => switchTab('history'));
       tabBtns.rules.addEventListener('click', () => switchTab('rules'));
+      tabBtns.logs.addEventListener('click', () => switchTab('logs'));
 
       // ================== CALENDAR & PLANNER ==================
       function renderCalendar() {
@@ -1928,7 +2067,9 @@ alter publication supabase_realtime add table chat_messages;`;
             const sameDay = meetups.filter((m) => m.date === selectedDate && m.id !== id);
             activeMeetupId = sameDay.length > 0 ? sameDay[0].id : null;
           }
+          const delTarget = meetups.find((x) => x.id === id);
           persistDeleteMeetup(id);
+          logActivity('약속 삭제', `'${delTarget ? delTarget.title : id}' 약속 삭제`);
           showToast('약속을 삭제했습니다.');
           return;
         }
@@ -1988,6 +2129,7 @@ alter publication supabase_realtime add table chat_messages;`;
         activeMeetupId = newMeetup.id;
 
         persistAddMeetup(newMeetup);
+        logActivity('약속 생성', `'${title}' (${date} ${time})`);
         closeMeetupModal();
         showToast(`'${title}' 약속을 만들었습니다.`);
       });
@@ -2039,11 +2181,34 @@ alter publication supabase_realtime add table chat_messages;`;
 
         const curAttendees = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
         const checkedCount = curAttendees.filter((a) => a.status === 'ontime' || a.status === 'late').length;
+        const ontimeCount = curAttendees.filter((a) => a.status === 'ontime').length;
         settleAttendeeCountLabel.textContent = `${m.n}명 참여 · ${checkedCount}명 출석`;
 
-        // Update my check-in button & QR button state (1st person uses button, others scan QR)
+        const [syy, smm, sdd] = (m.date || todayStr).split('-').map(Number);
+        const [shh, smi] = (m.time || '18:00').split(':').map(Number);
+        const scheduledMs = new Date(syy, (smm || 1) - 1, sdd || 1, shh || 0, smi || 0, 0, 0).getTime();
+        const nowMs = Date.now();
+        const isTooEarlyForCheckin = nowMs < scheduledMs - 60 * 60 * 1000;
+        const isAfterMeetupStart = nowMs > scheduledMs;
+
+        // Update Join button state (lock new joins after meetup scheduled time)
         const myId = userProfile && userProfile.id ? userProfile.id : '';
         const myAtt = myId ? curAttendees.find((a) => a.id === myId) : null;
+        if (myAtt) {
+          btnJoinAsMe.disabled = true;
+          btnJoinAsMe.className = 'px-3 py-1.5 rounded-lg bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1.5 cursor-default';
+          btnJoinAsMeLabel.textContent = `참여 완료 (${myAtt.name})`;
+        } else if (isAfterMeetupStart) {
+          btnJoinAsMe.disabled = true;
+          btnJoinAsMe.className = 'px-3 py-1.5 rounded-lg bg-slate-200 text-slate-500 text-xs font-semibold flex items-center gap-1.5 cursor-not-allowed';
+          btnJoinAsMeLabel.textContent = '참여 마감 (약속 시간 경과)';
+        } else {
+          btnJoinAsMe.disabled = false;
+          btnJoinAsMe.className = 'px-3 py-1.5 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition flex items-center gap-1.5';
+          renderProfileUI();
+        }
+
+        // Update my check-in button & QR button state:
         if (myAtt && myAtt.status === 'ontime') {
           btnCheckinMeLabel.textContent = `정시 출석 완료 (${myAtt.checkInTime})`;
           btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-default';
@@ -2051,13 +2216,17 @@ alter publication supabase_realtime add table chat_messages;`;
         } else if (myAtt && myAtt.status === 'late') {
           btnCheckinMeLabel.textContent = `지각 체크됨 (${myAtt.lateMinutes}분)`;
           btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-rose-100 text-rose-800 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-default';
-          btnShowQr.classList.remove('hidden');
-        } else if (checkedCount === 0) {
-          btnCheckinMeLabel.textContent = '1등 출석 체크 (선발대)';
+          btnShowQr.classList.add('hidden');
+        } else if (isTooEarlyForCheckin) {
+          btnCheckinMeLabel.textContent = '출석 오픈 전 (약속 1시간 전부터)';
+          btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-slate-200 text-slate-500 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed';
+          btnShowQr.classList.add('hidden');
+        } else if (ontimeCount === 0) {
+          btnCheckinMeLabel.textContent = checkedCount === 0 ? '1등 출석 체크 (선발대)' : '출석 체크 (도착 확인)';
           btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-xs';
           btnShowQr.classList.add('hidden');
         } else {
-          btnCheckinMeLabel.textContent = '1등 출석 완료 · QR 찍어 출석하세요';
+          btnCheckinMeLabel.textContent = '정시 도착자 있음 · QR 찍어 출석하세요';
           btnCheckinMe.className = 'flex-1 min-w-[150px] px-3 py-1.5 rounded-lg bg-slate-200 text-slate-600 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed';
           btnShowQr.classList.add('hidden');
         }
@@ -2078,9 +2247,13 @@ alter publication supabase_realtime add table chat_messages;`;
                 statusBadge = `<span class="text-[10px] font-bold text-rose-600 ml-1">${att.lateMinutes}분 지각</span>`;
                 chipBg = 'bg-rose-50 border-rose-200';
               }
+              const isMe = myId && att.id === myId;
+              const leaveBtnHtml = isMe
+                ? `<button type="button" data-leave-name="${escapeHtml(att.name)}" data-leave-id="${escapeHtml(att.id)}" class="leave-chip-btn px-1.5 py-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="내 참여 취소">×</button>`
+                : '';
               return `<span class="inline-flex items-center rounded-lg ${chipBg} overflow-hidden border">
                 <button type="button" data-chip-name="${escapeHtml(att.name)}" data-chip-id="${escapeHtml(att.id)}" class="attendee-chip-btn px-2.5 py-1 hover:bg-indigo-100/70 text-xs font-semibold text-slate-700 transition">${escapeHtml(att.name)}${idTag} <span class="text-[10px] text-indigo-500">(${cnt}회)</span>${statusBadge}</button>
-                <button type="button" data-leave-name="${escapeHtml(att.name)}" data-leave-id="${escapeHtml(att.id)}" class="leave-chip-btn px-1.5 py-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="참여 취소">×</button>
+                ${leaveBtnHtml}
               </span>`;
             })
             .join('');
@@ -2137,18 +2310,27 @@ alter publication supabase_realtime add table chat_messages;`;
       function addParticipantToActiveMeetup(id, name) {
         const m = meetups.find((x) => x.id === activeMeetupId);
         if (!m) return;
+        const [yy, mm, dd] = (m.date || todayStr).split('-').map(Number);
+        const [hh, mi] = (m.time || '18:00').split(':').map(Number);
+        const scheduledMs = new Date(yy, (mm || 1) - 1, dd || 1, hh || 0, mi || 0, 0, 0).getTime();
+        if (Date.now() > scheduledMs) {
+          showToast('약속 시간 이후에는 신규 참여가 마감되었습니다.');
+          return;
+        }
+        if (!id) {
+          showToast('고유 아이디 설정 후 참여할 수 있습니다.');
+          return;
+        }
         const cur = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
-        const dup = id
-          ? cur.some((a) => a.id === id)
-          : cur.some((a) => !a.id && a.name === name);
-        if (dup) {
+        if (cur.some((a) => a.id === id)) {
           showToast(`${name}님은 이미 참여 중입니다.`);
           return;
         }
-        const nextAttendees = [...cur, { id: id || '', name }];
-        const nextN = (m.n === cur.length || m.n < nextAttendees.length) ? nextAttendees.length : m.n;
+        const nextAttendees = [...cur, { id, name, status: 'pending', checkInTime: '', lateMinutes: 0 }];
+        const nextN = nextAttendees.length;
         persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
-        showToast(`${name}${id ? ' (@' + id + ')' : ''}님이 약속에 참여했습니다! (${nextN}명)`);
+        logActivity('약속 참여', `'${m.title}' 약속에 참여 (${nextN}명)`);
+        showToast(`${name} (@${id})님이 약속에 참여했습니다! (${nextN}명)`);
       }
 
       btnJoinAsMe.addEventListener('click', () => {
@@ -2177,7 +2359,7 @@ alter publication supabase_realtime add table chat_messages;`;
         }
 
         const cur = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
-        const checkedCount = cur.filter((a) => a.status === 'ontime' || a.status === 'late').length;
+        const ontimeCount = cur.filter((a) => a.status === 'ontime').length;
         let myIdx = cur.findIndex((a) => a.id === userProfile.id);
 
         if (myIdx !== -1 && (cur[myIdx].status === 'ontime' || cur[myIdx].status === 'late')) {
@@ -2185,8 +2367,8 @@ alter publication supabase_realtime add table chat_messages;`;
           return;
         }
 
-        if (!viaQr && checkedCount > 0) {
-          showToast('이미 1등이 출석했습니다! 현장의 출석 QR을 찍어주세요.');
+        if (!viaQr && ontimeCount > 0) {
+          showToast('정시 도착자가 이미 출석했습니다! 현장의 출석 QR을 찍어주세요.');
           return;
         }
 
@@ -2194,6 +2376,14 @@ alter publication supabase_realtime add table chat_messages;`;
         const [yy, mm, dd] = (m.date || todayStr).split('-').map(Number);
         const [hh, mi] = (m.time || '18:00').split(':').map(Number);
         const scheduledDt = new Date(yy, (mm || 1) - 1, dd || 1, hh || 0, mi || 0, 0, 0);
+        if (nowDt.getTime() < scheduledDt.getTime() - 60 * 60 * 1000) {
+          showToast('출석 체크는 약속 시간 1시간 전부터 가능합니다.');
+          return;
+        }
+        if (myIdx === -1 && nowDt.getTime() > scheduledDt.getTime()) {
+          showToast('약속 시간 이후에는 신규 참여가 마감되어 출석할 수 없습니다.');
+          return;
+        }
         const diffSec = Math.floor((nowDt.getTime() - scheduledDt.getTime()) / 1000);
         const checkInTime = nowDt.toLocaleTimeString('ko-KR', {
           hour: '2-digit',
@@ -2224,6 +2414,7 @@ alter publication supabase_realtime add table chat_messages;`;
             lateMinutes: 0,
           };
           await persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
+          logActivity('정시 출석', `'${m.title}' ${viaQr ? 'QR ' : ''}정시 출석 (${checkInTime})`);
           showToast(`${viaQr ? 'QR ' : ''}정시 도착 출석 완료! (${checkInTime})`);
         } else {
           const t = Math.ceil(diffSec / 60);
@@ -2258,6 +2449,7 @@ alter publication supabase_realtime add table chat_messages;`;
             votes: [],
           };
           await persistAddRecord(item);
+          logActivity('지각 출석', `'${m.title}' ${viaQr ? 'QR ' : ''}${t}분 지각 (${formatWon(total)})`);
           showToast(`${viaQr ? 'QR ' : ''}${t}분 지각 자동 정산: ${formatWon(total)} (${k}회차 · ${mult}배)`);
         }
       }
@@ -2356,34 +2548,25 @@ alter publication supabase_realtime add table chat_messages;`;
         }
       }
 
-      function handleJoinMeetup() {
-        const name = joinMeetupName.value.trim();
-        if (!name) {
-          showToast('추가할 친구 이름을 입력해 주세요.');
-          return;
-        }
-        joinMeetupName.value = '';
-        addParticipantToActiveMeetup('', name);
-      }
 
-      btnJoinMeetup.addEventListener('click', handleJoinMeetup);
-      joinMeetupName.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') handleJoinMeetup();
-      });
 
       settleAttendeeChips.addEventListener('click', (e) => {
         const leaveBtn = e.target.closest('.leave-chip-btn');
         if (leaveBtn) {
           const m = meetups.find((x) => x.id === activeMeetupId);
           if (!m) return;
+          const myId = userProfile && userProfile.id ? userProfile.id : '';
           const targetName = leaveBtn.getAttribute('data-leave-name');
           const targetId = leaveBtn.getAttribute('data-leave-id');
+          if (!myId || !targetId || targetId !== myId) {
+            showToast('본인의 참여만 취소할 수 있습니다.');
+            return;
+          }
           const cur = (Array.isArray(m.attendees) ? m.attendees : []).map(normAttendee);
-          const nextAttendees = cur.filter((a) =>
-            targetId ? a.id !== targetId : !(a.id === '' && a.name === targetName)
-          );
+          const nextAttendees = cur.filter((a) => a.id !== targetId);
           const nextN = m.n === cur.length ? nextAttendees.length : m.n;
           persistUpdateMeetup(m.id, { attendees: nextAttendees, n: nextN });
+          logActivity('참여 취소', `'${m.title}' 약속 참여 취소`);
           showToast(`${targetName}님이 참여를 취소했습니다.`);
           return;
         }
@@ -2442,6 +2625,7 @@ alter publication supabase_realtime add table chat_messages;`;
         settleName.value = '';
         selectedSettleMemberId = '';
         persistAddRecord(item);
+        logActivity('수동 정산', `'${m.title}' ${name} (${exempt ? '면제' : formatWon(total)})`);
         showToast(`${name}님 지각비 ${formatWon(total)} 저장 완료!`);
       });
 
@@ -2459,7 +2643,9 @@ alter publication supabase_realtime add table chat_messages;`;
         const btn = e.target.closest('.del-settle-rec-btn');
         if (!btn) return;
         const id = btn.getAttribute('data-del-settle-rec');
+        const delR = records.find((x) => x.id === id);
         persistDeleteRecord(id);
+        logActivity('기록 삭제', `${delR ? delR.name + ' (' + formatWon(delR.total) + ')' : id} 삭제`);
         showToast('정산 내역을 삭제했습니다.');
       });
 
@@ -2595,25 +2781,7 @@ alter publication supabase_realtime add table chat_messages;`;
         copyText(msg, '단톡방 공유 문구를 복사했습니다.');
       });
 
-      btnSaveRecord.addEventListener('click', () => {
-        const name = (inputName.value || '').trim() || '익명';
-        const date = inputDate.value || todayStr;
-        const { n, k, t, x, mult, total } = getValues();
-        const item = {
-          id: 'r_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-          name,
-          date,
-          n,
-          k,
-          t,
-          x,
-          mult,
-          total,
-          exempt: false,
-        };
-        persistAddRecord(item);
-        showToast(`${name}님의 지각비 ${formatWon(total)}을 기록했습니다.`);
-      });
+
 
       // ================== HISTORY ==================
       function renderHistory() {
@@ -2646,16 +2814,22 @@ alter publication supabase_realtime add table chat_messages;`;
           historyKSummaryCard.classList.add('hidden');
         }
 
-        if (records.length === 0) {
+        const filteredRecords = records.filter((r) => {
+          if (historyFilter === 'all') return true;
+          const ctx = getVoteContext(r);
+          return ctx.status === historyFilter;
+        });
+
+        if (filteredRecords.length === 0) {
           historyList.innerHTML = `
             <div class="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-              아직 저장된 정산 기록이 없습니다. 캘린더에서 약속을 만들거나 계산기에서 저장해 보세요.
+              ${records.length === 0 ? '아직 저장된 정산 기록이 없습니다. 캘린더에서 약속을 만들고 출석 체크를 진행해 보세요.' : '선택한 필터 조건에 해당하는 정산 기록이 없습니다.'}
             </div>
           `;
           return;
         }
 
-        historyList.innerHTML = records
+        historyList.innerHTML = filteredRecords
           .map((r) => {
             const ctx = getVoteContext(r);
             const cardBorder =
@@ -2711,7 +2885,9 @@ alter publication supabase_realtime add table chat_messages;`;
         const btn = e.target.closest('.del-record-btn');
         if (!btn) return;
         const id = btn.getAttribute('data-del-id');
+        const delR = records.find((x) => x.id === id);
         persistDeleteRecord(id);
+        logActivity('기록 삭제', `${delR ? delR.name + ' (' + formatWon(delR.total) + ')' : id} 삭제`);
         showToast('기록을 삭제했습니다.');
       });
 
@@ -2731,9 +2907,24 @@ alter publication supabase_realtime add table chat_messages;`;
         copyText(lines.join('\n'), '전체 정산 내역을 복사했습니다.');
       });
 
+      historyFilterBar.addEventListener('click', (e) => {
+        const btn = e.target.closest('.hist-filter-btn');
+        if (!btn) return;
+        historyFilter = btn.getAttribute('data-hist-filter') || 'all';
+        historyFilterBar.querySelectorAll('.hist-filter-btn').forEach((b) => {
+          if (b.getAttribute('data-hist-filter') === historyFilter) {
+            b.className = 'hist-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold transition bg-indigo-600 text-white shadow-xs';
+          } else {
+            b.className = 'hist-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold transition bg-white border border-slate-200 text-slate-600 hover:bg-slate-50';
+          }
+        });
+        renderHistory();
+      });
+
       btnClearHistory.addEventListener('click', () => {
         if (records.length === 0) return;
         persistClearRecords();
+        logActivity('전체 삭제', '정산 기록 전체 삭제');
         showToast('모든 기록을 삭제했습니다.');
       });
 
